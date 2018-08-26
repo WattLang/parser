@@ -19,41 +19,38 @@ std::optional<std::string> parse(std::vector<Token> const& tokens) {
 
     try {
         auto expression = parse_expression(i, tokens);
-        std::cout << "parse # index: " << i << '\n';
         if (!expression || i < tokens.size())
-            return std::cout << "parse = {}\n", std::nullopt;
+            return {};
     
         return expression->compile(0);
 
     } catch(std::out_of_range const&) {
-        return std::cout << "parse (/!\\ out_of_range) = {}\n", std::nullopt;
+        return {};
     }
 }
 
 std::unique_ptr<AST> parse_number(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index++);
-    std::cout << "parse_number # index: " << index << '\n';
 
     if (token.type != TokenType::Litteral || token.subtype != TokenSubType::Float) 
-        return std::cout << "parse_number = nullptr\n", nullptr;
+        return nullptr;
 
-    return std::cout << "parse_number = <number>\n", std::make_unique<Number>(
+    return std::make_unique<Number>(
         token.content
     );
 }
 
 std::unique_ptr<AST> parse_term(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index);
-    std::cout << "parse_term # index: " << index << '\n';
 
     switch(token.type) {
         case TokenType::Litteral: 
             if (token.subtype == TokenSubType::Float)
-                return std::cout << "parse_term = <number>\n", parse_number(index, tokens);
+                return parse_number(index, tokens);
             else 
-                return std::cout << "parse_term = nullptr\n", nullptr;
+                return nullptr;
         default:
-            return std::cout << "parse_term = nullptr\n", nullptr;
+            return nullptr;
     }
 }
 
@@ -68,7 +65,6 @@ std::unique_ptr<AST> parse_low_binary_operation(std::size_t& index, std::vector<
         return std::move(lhs);
 
     auto* token = &tokens.at(index);
-    std::cout << "parse_low_binary_operation # index: " << index << '\n';
 
     while(token->type == TokenType::Operator && (token->subtype == TokenSubType::Plus || token->subtype == TokenSubType::Minus)) {
         index++;
@@ -79,16 +75,14 @@ std::unique_ptr<AST> parse_low_binary_operation(std::size_t& index, std::vector<
             case TokenSubType::Minus:
                 name = "subtract"; break;
             default:
-                return std::cout << "parse_low_binary_operation (/!\\ JSON corrupted) = nullptr\n", nullptr;
+                return nullptr;
         }
 
         auto rhs = parse_high_binary_operation(index, tokens);
-        std::cout << "parse_low_binary_operation ## index: " << index << '\n';
 
         if (!rhs || !lhs)
-            return std::cout << "parse_low_binary_operation = nullptr\n", nullptr;
+            return nullptr;
 
-        std::cout << "parse_low_binary_operation = <" + name + ">\n";
         lhs = std::make_unique<BinaryOperator>(
             name,
             std::move(lhs),
@@ -99,7 +93,6 @@ std::unique_ptr<AST> parse_low_binary_operation(std::size_t& index, std::vector<
             return std::move(lhs);
             
         token = &tokens.at(index);
-        std::cout << "parse_low_binary_operation # index: " << index << '\n';
     }
 
     return std::move(lhs);
@@ -112,7 +105,6 @@ std::unique_ptr<AST> parse_high_binary_operation(std::size_t& index, std::vector
         return std::move(lhs);
 
     auto* token = &tokens.at(index);
-    std::cout << "parse_low_binary_operation # index: " << index << '\n';
 
     while(token->type == TokenType::Operator && (token->subtype == TokenSubType::Division || token->subtype == TokenSubType::Multiplication)) {
         index++;
@@ -123,16 +115,14 @@ std::unique_ptr<AST> parse_high_binary_operation(std::size_t& index, std::vector
             case TokenSubType::Multiplication:
                 name = "multiplication"; break;
             default:
-                return std::cout << "parse_high_binary_operation (/!\\ JSON corrupted) = nullptr\n", nullptr;
+                return nullptr;
         }
 
         auto rhs = parse_term(index, tokens);
-        std::cout << "parse_high_binary_operation ## index: " << index << '\n';
 
         if (!rhs || !lhs)
-            return std::cout << "parse_high_binary_operation = nullptr\n", nullptr;
+            return nullptr;
 
-        std::cout << "parse_high_binary_operation = <" + name + ">\n";
         lhs = std::make_unique<BinaryOperator>(
             name,
             std::move(lhs),
@@ -143,7 +133,6 @@ std::unique_ptr<AST> parse_high_binary_operation(std::size_t& index, std::vector
             return std::move(lhs);
             
         token = &tokens.at(index);
-        std::cout << "parse_low_binary_operation # index: " << index << '\n';
     }
 
     return std::move(lhs);
