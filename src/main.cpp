@@ -29,9 +29,13 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable) {
 
     if (out.has_value() == parsable) {
         std::cout << "OK!\n";
+        if (out)
+            std::cout << *out << '\n';
         return true;
     } else {
         std::cout << "ERROR!\n";
+        if (out)
+            std::cout << *out << '\n';
         return false;
     }
 }
@@ -48,6 +52,9 @@ int main() {
     &&  check({number(42), div(), number(666)}, true)
     &&  check({number(42), plus(), number(1337)}, true)
     &&  check({number(42), plus(), number(1337), div(), number(1337)}, true)
+    &&  check({number(42), div(), number(1337), plus(), number(1337)}, true)
+    &&  check({number(1337), plus(), number(42), div(), number(1337), plus(), number(1337)}, true)
+    &&  check({number(42), div(), number(1337), plus(), number(1337), div(), number(1337)}, true)
     &&  check({plus(), number(42), plus(), number(1337)}, false)
     &&  check({number(42), plus(), div(), number(1337)}, false);
 
