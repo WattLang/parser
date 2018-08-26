@@ -39,17 +39,21 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool pri
     }
     std::cout << "`\n\t";
 
-    if (out.has_value() == parsable) {
-        std::cout << "OK!\n";
-        if (print_ast && out)
-            std::cout << *out << '\n';
-        return true;
-    } else {
-        std::cout << "ERROR!\n";
-        if (print_ast && out)
-            std::cout << *out << '\n';
-        return false;
-    }
+    bool test_pass = !is_error(out) == parsable;
+
+    if (test_pass)
+        std::cout << "OK";
+    else 
+        std::cout << "ERROR";
+
+    if (print_ast && !is_error(out))
+        std::cout << ": " << std::get<std::unique_ptr<ws::parser::AST>>(out)->compile(0) << '\n';
+    else if (is_error(out))
+        std::cout << ": " << std::get<ws::parser::ParserError>(out).what() << '\n';
+    else 
+        std::cout << '\n';
+
+    return test_pass;
 }
 
 int main(int argc, char** argv) {

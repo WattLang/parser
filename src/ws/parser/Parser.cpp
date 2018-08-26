@@ -8,39 +8,72 @@
 
 namespace ws { namespace parser {
 
-std::unique_ptr<AST> parse_number(std::size_t& index, std::vector<Token> const& tokens);
-std::unique_ptr<AST> parse_term(std::size_t& index, std::vector<Token> const& tokens);
-std::unique_ptr<AST> parse_expression(std::size_t& index, std::vector<Token> const& tokens);
-std::unique_ptr<AST> parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
-std::unique_ptr<AST> parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
+parse_result parse_number(std::size_t& index, std::vector<Token> const& tokens);
+parse_result parse_term(std::size_t& index, std::vector<Token> const& tokens);
+parse_result parse_expression(std::size_t& index, std::vector<Token> const& tokens);
+parse_result parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
+parse_result parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
 
-std::optional<std::string> parse(std::vector<Token> const& tokens) {
+ParserError ParserError::expected(std::vector<std::string> const& tokens) {
+    std::string error = "Excepted one of ";
+    for(std::size_t i = 0; i < tokens.size(); ++i) {
+        if (i > 0)
+            error += ", ";
+        error += '`' + tokens[i] + "`";
+    }
+    return { error };
+}
+ParserError ParserError::unknown_token(std::string const& token) {
+    return {"Unknown token `" + token + "`"};
+}
+
+ParserError ParserError::error() {
+    return {"Unknown error"};
+}
+
+std::string ParserError::what() const {
+    return error_msg;
+}
+
+ParserError::ParserError(std::string const& error_msg) : error_msg(error_msg) {}
+
+bool is_error(parse_result const& res) {
+    return !std::holds_alternative<std::unique_ptr<AST>>(res);
+}
+
+std::string get_message(parse_result const& res) {
+    if (auto error = std::get_if<ParserError>(&res); error) 
+        return error->what();
+    return std::get<std::unique_ptr<AST>>(res)->compile(0);
+}
+
+parse_result parse(std::vector<Token> const& tokens) {
     std::size_t i = 0;
 
     try {
         auto expression = parse_expression(i, tokens);
-        if (!expression || i < tokens.size())
-            return {};
+        if (i < tokens.size())
+            return ParserError::expected({"expression"});
     
-        return expression->compile(0);
+        return expression;
 
     } catch(std::out_of_range const&) {
-        return {};
+        return ParserError::error();
     }
 }
 
-std::unique_ptr<AST> parse_number(std::size_t& index, std::vector<Token> const& tokens) {
+parse_result parse_number(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index++);
 
     if (token.type != TokenType::Litteral || token.subtype != TokenSubType::Float) 
-        return nullptr;
+        return ParserError::expected({"number litteral"});
 
     return std::make_unique<Number>(
         token.content
     );
 }
 
-std::unique_ptr<AST> parse_term(std::size_t& index, std::vector<Token> const& tokens) {
+parse_result parse_term(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index);
 
     switch(token.type) {
@@ -48,21 +81,23 @@ std::unique_ptr<AST> parse_term(std::size_t& index, std::vector<Token> const& to
             if (token.subtype == TokenSubType::Float)
                 return parse_number(index, tokens);
             else 
-                return nullptr;
+                return ParserError::expected({"number litteral"});
         default:
-            return nullptr;
+            return ParserError::expected({"litteral"});
     }
 }
 
-std::unique_ptr<AST> parse_expression(std::size_t& index, std::vector<Token> const& tokens) {
+parse_result parse_expression(std::size_t& index, std::vector<Token> const& tokens) {
     return parse_low_binary_operation(index, tokens);
 }
 
-std::unique_ptr<AST> parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
-    std::unique_ptr<AST> lhs = parse_high_binary_operation(index, tokens);
+parse_result parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
+    auto lhs = parse_high_binary_operation(index, tokens);
+    if (is_error(lhs))
+        return lhs;
 
     if (index >= tokens.size())
-        return std::move(lhs);
+        return lhs;
 
     auto* token = &tokens.at(index);
 
@@ -75,34 +110,37 @@ std::unique_ptr<AST> parse_low_binary_operation(std::size_t& index, std::vector<
             case TokenSubType::Minus:
                 name = "subtract"; break;
             default:
-                return nullptr;
+                return ParserError::unknown_token(token->content);
         }
 
         auto rhs = parse_high_binary_operation(index, tokens);
 
-        if (!rhs || !lhs)
-            return nullptr;
+        if (is_error(rhs))
+            return rhs;
 
         lhs = std::make_unique<BinaryOperator>(
             name,
-            std::move(lhs),
-            std::move(rhs)
+            std::move(std::get<std::unique_ptr<AST>>(lhs)),
+            std::move(std::get<std::unique_ptr<AST>>(rhs))
         );
 
         if (index >= tokens.size())
-            return std::move(lhs);
+            return lhs;
             
         token = &tokens.at(index);
     }
 
-    return std::move(lhs);
+    return lhs;
 }
 
-std::unique_ptr<AST> parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
-    std::unique_ptr<AST> lhs = parse_term(index, tokens);
+parse_result parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
+    auto lhs = parse_term(index, tokens);
+
+    if (is_error(lhs))
+        return lhs;
 
     if (index >= tokens.size())
-        return std::move(lhs);
+        return lhs;
 
     auto* token = &tokens.at(index);
 
@@ -115,27 +153,27 @@ std::unique_ptr<AST> parse_high_binary_operation(std::size_t& index, std::vector
             case TokenSubType::Multiplication:
                 name = "multiplication"; break;
             default:
-                return nullptr;
+                return ParserError::unknown_token(token->content);
         }
 
         auto rhs = parse_term(index, tokens);
 
-        if (!rhs || !lhs)
-            return nullptr;
+        if (is_error(rhs))
+            return rhs;
 
         lhs = std::make_unique<BinaryOperator>(
             name,
-            std::move(lhs),
-            std::move(rhs)
+            std::move(std::get<std::unique_ptr<AST>>(lhs)),
+            std::move(std::get<std::unique_ptr<AST>>(rhs))
         );
 
         if (index >= tokens.size())
-            return std::move(lhs);
+            return lhs;
             
         token = &tokens.at(index);
     }
 
-    return std::move(lhs);
+    return lhs;
 }
 
 }}
