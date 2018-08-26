@@ -209,7 +209,7 @@ run:
 	@$(TARGET_EXE) $(args); ERR=$$?; $(call _special,PROGRAM HALT WITH CODE $$ERR); exit $$ERR;
 
 re-run:
-	@make re-executable
+	@make re
 	@make run
 
 valgrind:
