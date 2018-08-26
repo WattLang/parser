@@ -5,49 +5,18 @@
 #include <ws/parser/BinaryOperator.hpp>
 
 #include <iostream>
+#include <map>
 
 namespace ws { namespace parser {
 
-parse_result parse_number(std::size_t& index, std::vector<Token> const& tokens);
-parse_result parse_term(std::size_t& index, std::vector<Token> const& tokens);
-parse_result parse_expression(std::size_t& index, std::vector<Token> const& tokens);
-parse_result parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
-parse_result parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
+ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens);
+ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens);
+ParserResult parse_expression(std::size_t& index, std::vector<Token> const& tokens);
+ParserResult parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
+ParserResult parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
+ParserResult parse_binary_operation(std::size_t& index, std::vector<Token> const& tokens, ParserResult(*next)(std::size_t&, std::vector<Token> const&), std::map<std::pair<TokenType, TokenSubType>, std::string> const& names);
 
-ParserError ParserError::expected(std::vector<std::string> const& tokens) {
-    std::string error = "Excepted one of ";
-    for(std::size_t i = 0; i < tokens.size(); ++i) {
-        if (i > 0)
-            error += ", ";
-        error += '`' + tokens[i] + "`";
-    }
-    return { error };
-}
-ParserError ParserError::unknown_token(std::string const& token) {
-    return {"Unknown token `" + token + "`"};
-}
-
-ParserError ParserError::error() {
-    return {"Unknown error"};
-}
-
-std::string ParserError::what() const {
-    return error_msg;
-}
-
-ParserError::ParserError(std::string const& error_msg) : error_msg(error_msg) {}
-
-bool is_error(parse_result const& res) {
-    return !std::holds_alternative<std::unique_ptr<AST>>(res);
-}
-
-std::string get_message(parse_result const& res) {
-    if (auto error = std::get_if<ParserError>(&res); error) 
-        return error->what();
-    return std::get<std::unique_ptr<AST>>(res)->compile(0);
-}
-
-parse_result parse(std::vector<Token> const& tokens) {
+ParserResult parse(std::vector<Token> const& tokens) {
     std::size_t i = 0;
 
     try {
@@ -62,7 +31,7 @@ parse_result parse(std::vector<Token> const& tokens) {
     }
 }
 
-parse_result parse_number(std::size_t& index, std::vector<Token> const& tokens) {
+ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index++);
 
     if (token.type != TokenType::Litteral || token.subtype != TokenSubType::Float) 
@@ -73,7 +42,7 @@ parse_result parse_number(std::size_t& index, std::vector<Token> const& tokens) 
     );
 }
 
-parse_result parse_term(std::size_t& index, std::vector<Token> const& tokens) {
+ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index);
 
     switch(token.type) {
@@ -87,54 +56,31 @@ parse_result parse_term(std::size_t& index, std::vector<Token> const& tokens) {
     }
 }
 
-parse_result parse_expression(std::size_t& index, std::vector<Token> const& tokens) {
+ParserResult parse_expression(std::size_t& index, std::vector<Token> const& tokens) {
     return parse_low_binary_operation(index, tokens);
 }
 
-parse_result parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
-    auto lhs = parse_high_binary_operation(index, tokens);
-    if (is_error(lhs))
-        return lhs;
-
-    if (index >= tokens.size())
-        return lhs;
-
-    auto* token = &tokens.at(index);
-
-    while(token->type == TokenType::Operator && (token->subtype == TokenSubType::Plus || token->subtype == TokenSubType::Minus)) {
-        index++;
-        std::string name;
-        switch(token->subtype) {
-            case TokenSubType::Plus:
-                name = "plus"; break;
-            case TokenSubType::Minus:
-                name = "subtract"; break;
-            default:
-                return ParserError::unknown_token(token->content);
-        }
-
-        auto rhs = parse_high_binary_operation(index, tokens);
-
-        if (is_error(rhs))
-            return rhs;
-
-        lhs = std::make_unique<BinaryOperator>(
-            name,
-            std::move(std::get<std::unique_ptr<AST>>(lhs)),
-            std::move(std::get<std::unique_ptr<AST>>(rhs))
-        );
-
-        if (index >= tokens.size())
-            return lhs;
-            
-        token = &tokens.at(index);
-    }
-
-    return lhs;
+ParserResult parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
+    return parse_binary_operation(index, tokens, parse_high_binary_operation, {
+        {{TokenType::Operator, TokenSubType::Plus}, "plus"},
+        {{TokenType::Operator, TokenSubType::Minus}, "subtract"}
+    });
 }
 
-parse_result parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
-    auto lhs = parse_term(index, tokens);
+ParserResult parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
+    return parse_binary_operation(index, tokens, parse_term, {
+        {{TokenType::Operator, TokenSubType::Multiplication}, "multiplication"},
+        {{TokenType::Operator, TokenSubType::Division}, "division"}
+    });
+}
+
+ParserResult parse_binary_operation(
+    std::size_t& index, 
+    std::vector<Token> const& tokens, 
+    ParserResult(*next)(std::size_t&, std::vector<Token> const&), 
+    std::map<std::pair<TokenType, TokenSubType>, std::string> const& names
+) {
+    auto lhs = next(index, tokens);
 
     if (is_error(lhs))
         return lhs;
@@ -142,35 +88,37 @@ parse_result parse_high_binary_operation(std::size_t& index, std::vector<Token> 
     if (index >= tokens.size())
         return lhs;
 
-    auto* token = &tokens.at(index);
+    std::optional<std::string> name;
+    auto get_name = [&names](TokenType type, TokenSubType subtype) -> std::optional<std::string> {
+        auto it = names.find({type, subtype});
+        if (it == names.end())
+            return std::nullopt;
+        return it->second;
+    };
 
-    while(token->type == TokenType::Operator && (token->subtype == TokenSubType::Division || token->subtype == TokenSubType::Multiplication)) {
+    {
+        auto* token = &tokens.at(index);
+        name = get_name(token->type, token->subtype);
+    }
+
+    while(name) {
         index++;
-        std::string name;
-        switch(token->subtype) {
-            case TokenSubType::Division:
-                name = "division"; break;
-            case TokenSubType::Multiplication:
-                name = "multiplication"; break;
-            default:
-                return ParserError::unknown_token(token->content);
-        }
-
-        auto rhs = parse_term(index, tokens);
+        auto rhs = next(index, tokens);
 
         if (is_error(rhs))
             return rhs;
 
         lhs = std::make_unique<BinaryOperator>(
-            name,
-            std::move(std::get<std::unique_ptr<AST>>(lhs)),
-            std::move(std::get<std::unique_ptr<AST>>(rhs))
+            *name,
+            std::move(*get_ast(lhs)),
+            std::move(*get_ast(rhs))
         );
 
         if (index >= tokens.size())
             return lhs;
             
-        token = &tokens.at(index);
+        auto& token = tokens.at(index);
+        name = get_name(token.type, token.subtype);
     }
 
     return lhs;
