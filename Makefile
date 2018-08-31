@@ -67,7 +67,7 @@ header-of = $(1:%$(EXT_SRC_FILE)=car_sim/%$(EXT_INC_FILE))
 # Relative to $(SRC_FOLDER)
 SRC_EXCLUDE_FILE := 
 # All files that are not use for libraries, don't add src/
-SRC_MAINS := main.cpp
+SRC_MAINS := test.cpp main.cpp
 # The main file to use (must be in $(SRC_MAINS))
 SRC_MAIN := main.cpp
 
@@ -175,10 +175,10 @@ export LD_LIBRARY_PATH += $(_LIB_PATH_LD)
 ##### RULES
 #####
 
-.PHONY: all executable 
+.PHONY: all executable test
 .PHONY: clean
-.PHONY: re 
-.PHONY: re-run run
+.PHONY: re re-test
+.PHONY: re-run run run-test re-run-test
 
 .DEFAULT_GOAL := all
 
@@ -191,6 +191,9 @@ executable:
 	@$(call _header,BUILDING EXECUTABLE...)
 	@make $(TARGET_EXE)
 
+test:
+	@make PROJECT_NAME=parser_test SRC_MAIN=test.cpp
+
 clean:
 	@$(call _header,REMOVING $(BUILD_FOLDER))
 	@$(call _remove-folder,$(BUILD_FOLDER))
@@ -202,15 +205,24 @@ re:
 	@make clean
 	@make
 
+re-test:
+	@make re PROJECT_NAME=parser_test SRC_MAIN=test.cpp
+
 run:
 	@make executable
 	@echo
 	@$(call _special,EXECUTING $(TARGET_EXE)...)
 	@$(TARGET_EXE) $(args); ERR=$$?; $(call _special,PROGRAM HALT WITH CODE $$ERR); exit $$ERR;
 
+run-test:
+	@make run PROJECT_NAME=parser_test SRC_MAIN=test.cpp
+
 re-run:
 	@make re
 	@make run
+
+re-run-test:
+	@make re-run PROJECT_NAME=parser_test SRC_MAIN=test.cpp
 
 valgrind:
 	@make executable
