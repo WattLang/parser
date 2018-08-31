@@ -3,6 +3,7 @@
 #include <ws/parser/AST.hpp>
 #include <ws/parser/Number.hpp>
 #include <ws/parser/BinaryOperator.hpp>
+#include <ws/parser/UnaryOperator.hpp>
 
 #include <iostream>
 #include <map>
@@ -50,9 +51,22 @@ ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens) {
             if (token.subtype == TokenSubType::Float)
                 return parse_number(index, tokens);
             else 
-                return ParserError::expected({"number litteral"});
+                return ParserError::expected({"number litteral", "minus"});
+
+        case TokenType::Operator: {
+            if (token.subtype != TokenSubType::Minus) 
+                return ParserError::expected({"number litteral", "minus"});
+
+            index++;
+            std::string name = tokens.at(index-1).content;
+            auto operand = parse_term(index, tokens);
+            if (is_error(operand))
+                return operand;
+            return std::make_unique<UnaryOperator>(name, std::move(*get_ast(operand)));
+        }
+
         default:
-            return ParserError::expected({"litteral"});
+            return ParserError::expected({"number litteral", "minus"});
     }
 }
 
