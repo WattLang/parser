@@ -6,7 +6,7 @@
 #include <ws/parser/Token.hpp>
 
 ws::parser::Token number(float f) {
-    return {std::to_string(f), ws::parser::TokenType::Litteral, ws::parser::TokenSubType::Float};
+    return {std::to_string(f), ws::parser::TokenType::Literal, ws::parser::TokenSubType::Float};
 }
 
 ws::parser::Token plus() {

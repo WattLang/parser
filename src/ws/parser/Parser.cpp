@@ -35,7 +35,7 @@ ParserResult parse(std::vector<Token> const& tokens) {
 ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index++);
 
-    if (token.type != TokenType::Litteral || token.subtype != TokenSubType::Float) 
+    if (token.type != TokenType::Literal || token.subtype != TokenSubType::Float) 
         return ParserError::expected({"number litteral"});
 
     return std::make_unique<Number>(
@@ -47,7 +47,7 @@ ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index);
 
     switch(token.type) {
-        case TokenType::Litteral: 
+        case TokenType::Literal: 
             if (token.subtype == TokenSubType::Float)
                 return parse_number(index, tokens);
             else 

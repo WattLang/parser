@@ -5,7 +5,7 @@ namespace ws { namespace parser {
 enum class TokenType {
     Parenthesis,
     Operator,
-    Litteral
+    Literal
 
 };
 
