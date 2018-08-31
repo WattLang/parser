@@ -4,8 +4,6 @@ Implementation of a parser module.
 
 ## Current State
 
-**[WIP]**
-
 Parser for a calculator.
 
 ## Usage
@@ -15,6 +13,9 @@ Parser for a calculator.
 `make run args=<...>` to build the parser and run with args given (quote them if you have spaces).
 
 `make` to only build it.
+
+> Example:
+> `tokens.json > make run` will parse the input and print the ast
 
 ### Test
 
