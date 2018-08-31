@@ -15,7 +15,7 @@ Parser for a calculator.
 `make` to only build it.
 
 > Example:
-> `tokens.json > make run` will parse the input and print the ast
+> `make run < tokens.json` will parse the input and print the ast
 
 ### Test
 
