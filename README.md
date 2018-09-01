@@ -38,7 +38,7 @@ The key `type` start with `literal`
 #### Number
 
 Key `type` : `literal.float`
-Key `value` : strign representation of the float
+Key `value` : string representation of the float
 
 ### Operator
 
