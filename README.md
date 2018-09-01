@@ -33,28 +33,28 @@ The root is one of the nodes below.
 
 ### Literal
 
-The key `type` start with `literal`
+The key `type` starts with `literal`.
 
 #### Number
 
-Key `type` : `literal.float`
-Key `value` : string representation of the float
+Key `type` : `literal.float`.
+Key `value` : string representation of the float.
 
 ### Operator
 
-The key `type` start with `operator`
+The key `type` starts with `operator`.
 
 #### Unary Operator
 
-Key `type` : `operator.minus`
-Key `operand` : node to negate
+Key `type` : `operator.minus`.
+Key `operand` : node to negate.
 
 > `- eval(this->operand)`
 
 #### Binary Operator
 
-Key `type` : `operator.X` where `X` is `plus`, `subtract`, `multiplication` or `division`
-Key `lhs` : the left operand's node
-Key `rhs` : the left operand's node
+Key `type` : `operator.X` where `X` is `plus`, `subtract`, `multiplication` or `division`.
+Key `lhs` : left operand's node.
+Key `rhs` : left operand's node.
 
 > `eval(this->lhs) op eval(this->rhs)` where `op` is `+`, `-`, `*` or `/`
