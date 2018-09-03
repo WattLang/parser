@@ -1,3 +1,3 @@
-[submodule "module"]
-	path = module
+[submodule "lib/module"]
+	path = lib/module
 	url = https://github.com/WotScript/module
