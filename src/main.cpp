@@ -57,7 +57,8 @@ std::vector<ws::parser::Token> parse_tokens(nlohmann::json const& json) {
 }
 
 int main() {
-    std::string raw_json = ws::receive_all(/* buffer size */ 4);
+    static constexpr std::uintmax_t buffer_size = 4;
+    std::string raw_json = ws::receive_all(buffer_size);
     auto json = nlohmann::json::parse(raw_json);
     auto tokens = parse_tokens(json);
     auto result = ws::parser::parse(tokens);
