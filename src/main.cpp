@@ -3,7 +3,7 @@
 #include <optional>
 #include <sstream>
 
-#include <ws/Module.hpp>
+#include <module/module.h>
 #include <json.hpp>
 #include <ws/parser/Parser.hpp>
 
@@ -75,31 +75,18 @@ std::vector<ws::parser::Token> parse_tokens(nlohmann::json const& json) {
 }
 
 int main() {
-    ws::Receiver rec(/* buffer size */ 4);
+    static constexpr std::uintmax_t buffer_size = 4;
+    std::string raw_json = ws::receive_all(buffer_size);
+    auto json = nlohmann::json::parse(raw_json);
+    auto tokens = parse_tokens(json);
+    auto result = ws::parser::parse(tokens);
 
-    std::string raw_json;
+    if (ws::parser::is_error(result)) {
+        ws::warn(ws::parser::get_error(result)->what());
+        return 1;
+    }
 
-    int error_code = 0;
+    ws::pipeln(ws::parser::get_ast(result)->get()->compile(0));
 
-    auto cb = [&raw_json, &error_code] (std::string const& buffer, int, bool end) {
-        raw_json += buffer;
-
-        if (end) {
-            auto json = nlohmann::json::parse(raw_json);
-            auto tokens = parse_tokens(json);
-            auto result = ws::parser::parse(tokens);
-
-            if (ws::parser::is_error(result)) {
-                ws::Logger().warn(ws::parser::get_error(result)->what());
-                error_code = 1;
-                return;
-            }
-
-            ws::pipeln(ws::parser::get_ast(result)->get()->compile(0));
-            return;
-        }
-    };
-
-    rec.read(cb);
-    return error_code;
+    return 0;
 }
