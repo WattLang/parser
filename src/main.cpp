@@ -17,7 +17,7 @@ std::vector<std::string> split_type(std::string const& s) {
 }
 
 std::optional<ws::parser::TokenType> parse_type(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
     if (s == "parenthesis")
         return ws::parser::TokenType::Parenthesis;
     if (s == "operator")
