@@ -79,7 +79,7 @@ FLAGS := -std=c++17 -g3 -Wall -Wextra -Wno-pmf-conversions -O2
 
 # Include path
 # Must be use with -I
-INC_FLAG := -I $(INC_FOLDER)
+INC_FLAG := -I $(INC_FOLDER) -I lib/
 
 #####
 ##### LIBRARY
