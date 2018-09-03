@@ -12,7 +12,7 @@ std::optional<ws::parser::TokenType> parse_type(std::string s) {
         return ws::parser::TokenType::Parenthesis;
     if (s == "operator")
         return ws::parser::TokenType::Operator;
-    if (s == "litteral")
+    if (s == "literal")
         return ws::parser::TokenType::Literal;
 
     return std::nullopt;
