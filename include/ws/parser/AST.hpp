@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace ws { namespace parser {
+namespace ws::parser {
 
 class AST {
 public:
@@ -13,4 +13,4 @@ private:
 
 };
 
-}}
+}

@@ -4,7 +4,7 @@
 
 #include <ws/parser/TokenType.hpp>
 
-namespace ws { namespace parser {
+namespace ws::parser {
 
 class Token {
 public:
@@ -17,4 +17,4 @@ public:
 
 };
 
-}}
+}
