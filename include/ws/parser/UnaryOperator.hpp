@@ -4,7 +4,7 @@
 
 #include <ws/parser/AST.hpp>
 
-namespace ws::parser {
+namespace ws { namespace parser {
 
 class UnaryOperator : public AST {
 public:
@@ -20,4 +20,4 @@ private:
 
 };
 
-}
+}}

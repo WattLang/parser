@@ -1,6 +1,6 @@
 #pragma once
 
-namespace ws::parser {
+namespace ws { namespace parser {
 
 enum class TokenType {
     Parenthesis,
@@ -16,4 +16,4 @@ enum class TokenSubType {
 
 };
 
-}
+}}

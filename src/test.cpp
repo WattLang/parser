@@ -2,7 +2,6 @@
 #include <vector>
 #include <iomanip>
 
-#include <module/module.h>
 #include <ws/parser/Parser.hpp>
 #include <ws/parser/Token.hpp>
 
@@ -29,30 +28,30 @@ ws::parser::Token sub() {
 bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool print_ast) {
     auto out = ws::parser::parse(tokens);
 
-    ws::module::piper << " `" << std::fixed << std::setprecision(2);
+    std::cout << " `" << std::fixed << std::setprecision(2);
     for(auto const& t : tokens) {
         try {
             float f = std::stof(t.content);
-            ws::module::piper << f << " ";
+            std::cout << f << " ";
         } catch(...) {
-            ws::module::piper << t.content << " ";
+            std::cout << t.content << " ";
         }
     }
-    ws::module::piper << "`\n\t";
+    std::cout << "`\n\t";
 
     bool test_pass = !is_error(out) == parsable;
 
     if (test_pass)
-        ws::module::piper << "OK";
-    else
-        ws::module::piper << "ERROR";
+        std::cout << "OK";
+    else 
+        std::cout << "ERROR";
 
     if (print_ast && !is_error(out))
-        ws::module::piper << ": " << (*get_ast(out))->compile(0) << '\n';
+        std::cout << ": " << (*get_ast(out))->compile(0) << '\n';
     else if (is_error(out))
-        ws::module::piper << ": " << get_error(out)->what() << '\n';
-    else
-        ws::module::piper << '\n';
+        std::cout << ": " << get_error(out)->what() << '\n';
+    else 
+        std::cout << '\n';
 
     return test_pass;
 }
@@ -60,7 +59,7 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool pri
 int main(int argc, char** argv) {
     bool print_ast = argc > 1 && std::string(argv[1]) == "--ast";
 
-    bool all_test =
+    bool all_test = 
         check({}, false, print_ast)
     &&  check({number(42)}, true, print_ast)
     &&  check({sub(), number(42)}, true, print_ast)

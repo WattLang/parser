@@ -8,7 +8,7 @@
 #include <iostream>
 #include <map>
 
-namespace ws::parser {
+namespace ws { namespace parser {
 
 ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens);
 ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens);
@@ -24,7 +24,7 @@ ParserResult parse(std::vector<Token> const& tokens) {
         auto expression = parse_expression(i, tokens);
         if (i < tokens.size())
             return ParserError::expected({"expression"});
-
+    
         return expression;
 
     } catch(std::out_of_range const&) {
@@ -35,7 +35,7 @@ ParserResult parse(std::vector<Token> const& tokens) {
 ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index++);
 
-    if (token.type != TokenType::Literal || token.subtype != TokenSubType::Float)
+    if (token.type != TokenType::Literal || token.subtype != TokenSubType::Float) 
         return ParserError::expected({"number litteral"});
 
     return std::make_unique<Number>(
@@ -47,14 +47,14 @@ ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens) {
     auto& token = tokens.at(index);
 
     switch(token.type) {
-        case TokenType::Literal:
+        case TokenType::Literal: 
             if (token.subtype == TokenSubType::Float)
                 return parse_number(index, tokens);
-            else
+            else 
                 return ParserError::expected({"number litteral", "minus"});
 
         case TokenType::Operator: {
-            if (token.subtype != TokenSubType::Minus)
+            if (token.subtype != TokenSubType::Minus) 
                 return ParserError::expected({"number litteral", "minus"});
 
             index++;
@@ -89,9 +89,9 @@ ParserResult parse_high_binary_operation(std::size_t& index, std::vector<Token> 
 }
 
 ParserResult parse_binary_operation(
-    std::size_t& index,
-    std::vector<Token> const& tokens,
-    ParserResult(*next)(std::size_t&, std::vector<Token> const&),
+    std::size_t& index, 
+    std::vector<Token> const& tokens, 
+    ParserResult(*next)(std::size_t&, std::vector<Token> const&), 
     std::map<std::pair<TokenType, TokenSubType>, std::string> const& names
 ) {
     auto lhs = next(index, tokens);
@@ -130,7 +130,7 @@ ParserResult parse_binary_operation(
 
         if (index >= tokens.size())
             return lhs;
-
+            
         auto& token = tokens.at(index);
         name = get_name(token.type, token.subtype);
     }
@@ -138,4 +138,4 @@ ParserResult parse_binary_operation(
     return lhs;
 }
 
-}
+}}

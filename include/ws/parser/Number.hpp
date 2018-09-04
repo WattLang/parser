@@ -2,7 +2,7 @@
 
 #include <ws/parser/AST.hpp>
 
-namespace ws::parser {
+namespace ws { namespace parser {
 
 class Number : public AST {
 public:
@@ -17,4 +17,4 @@ private:
 
 };
 
-}
+}}

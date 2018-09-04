@@ -8,7 +8,7 @@
 
 #include <ws/parser/AST.hpp>
 
-namespace ws::parser {
+namespace ws { namespace parser {
 
 class ParserError {
 public:
@@ -22,7 +22,7 @@ public:
 private:
 
     ParserError(std::string const& error_msg);
-
+    
     std::string error_msg;
 
 };
@@ -38,4 +38,4 @@ AST_ptr const* get_ast(ParserResult const& error);
 ParserError* get_error(ParserResult& error);
 AST_ptr* get_ast(ParserResult& error);
 
-}
+}}
