@@ -47,7 +47,7 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool pri
         std::cout << "ERROR";
 
     if (print_ast && !is_error(out))
-        std::cout << ": " << (*get_ast(out))->compile(0) << '\n';
+        std::cout << ": " << (*get_ast(out))->compile().dump(2) << '\n';
     else if (is_error(out))
         std::cout << ": " << get_error(out)->what() << '\n';
     else 
