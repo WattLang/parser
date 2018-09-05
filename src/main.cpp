@@ -68,7 +68,7 @@ std::vector<ws::parser::Token> parse_tokens(nlohmann::json const& json) {
             ws::module::println("Subtype ", types[1], " is not known");
             return {};
         }
-        
+
         tokens.emplace_back(json_token["content"].get<std::string>(), *type, *subtype);
     }
     return tokens;

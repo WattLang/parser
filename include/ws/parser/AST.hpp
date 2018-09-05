@@ -3,7 +3,7 @@
 #include <string>
 #include <json.hpp>
 
-namespace ws { namespace parser {
+namespace ws::parser {
 
 class AST {
 public:
@@ -14,4 +14,4 @@ private:
 
 };
 
-}}
+}
