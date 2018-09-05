@@ -86,7 +86,7 @@ int main() {
         return 1;
     }
 
-    ws::pipeln(ws::parser::get_ast(result)->get()->compile(0));
+    ws::pipeln(ws::parser::get_ast(result)->get()->compile(4));
 
     return 0;
 }
