@@ -9,7 +9,7 @@ public:
 
     Number(std::string const& value);
 
-    std::string compile(unsigned indentation) const override;
+    nlohmann::json compile() const override;
 
 private:
 

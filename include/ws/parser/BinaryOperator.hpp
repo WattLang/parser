@@ -11,7 +11,7 @@ public:
 
     BinaryOperator(std::string const& name, std::unique_ptr<AST> lhs, std::unique_ptr<AST> rhs);
 
-    std::string compile(unsigned indentation) const override;
+    nlohmann::json compile() const override;
 
 private:
 

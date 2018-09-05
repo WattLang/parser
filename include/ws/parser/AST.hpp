@@ -1,13 +1,14 @@
 #pragma once
 
 #include <string>
+#include <json.hpp>
 
 namespace ws { namespace parser {
 
 class AST {
 public:
 
-    virtual std::string compile(unsigned indentation) const = 0;
+    virtual nlohmann::json compile() const = 0;
 
 private:
 
