@@ -1,6 +1,6 @@
 #include <ws/parser/ParserResult.hpp>
 
-namespace ws { namespace parser {
+namespace ws::parser {
 
 ParserError ParserError::expected(std::vector<std::string> const& tokens) {
     std::string error = "Excepted one of ";
@@ -30,9 +30,9 @@ bool is_error(ParserResult const& res) {
 }
 
 std::string get_message(ParserResult const& res) {
-    if (auto error = get_error(res); error) 
+    if (auto error = get_error(res); error)
         return error->what();
-    return (*get_ast(res))->compile(0);
+    return (*get_ast(res))->compile().dump();
 }
 
 AST_ptr* get_ast(ParserResult& res) {
@@ -51,4 +51,4 @@ ParserError const* get_error(ParserResult const& res) {
     return std::get_if<ParserError>(&res);
 }
 
-}}
+}
