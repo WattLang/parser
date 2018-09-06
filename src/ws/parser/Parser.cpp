@@ -10,11 +10,60 @@
 
 namespace ws::parser {
 
+class TokenIterator {
+public:
+    using iterator = typename std::vector<Token>::const_iterator;
+
+    TokenIterator(iterator begin, iterator end) : begin(begin), end(end) {}
+
+    iterator get() const {
+        return begin;
+    }
+
+    Token const& operator*() const {
+        if (begin != end)
+            return *begin;
+        throw std::out_of_range("ouch");
+    }
+
+    Token const* operator->() const {
+        if (begin != end)
+            return &*begin;
+        throw std::out_of_range("ouch");
+    }
+
+    TokenIterator& operator++() {
+        begin++;
+        return *this;
+    }
+
+    TokenIterator& operator--() {
+        begin--;
+        return *this;
+    }
+
+    TokenIterator operator++(int) {
+        TokenIterator tmp(*this);
+        ++(*this);
+        return tmp;
+    }
+
+    TokenIterator operator--(int) {
+        TokenIterator tmp(*this);
+        --(*this);
+        return tmp;
+    }
+
+private:
+
+    iterator begin, end;
+
+};
 template<typename T>
 using Result = std::variant<ParserError, T>;
 
 template<typename T>
-using Parser = std::function<Result<T>(Token const&)>; 
+using Parser = std::function<Result<T>(TokenIterator&)>; 
 
 template<typename T>
 bool has_failed(Result<T> const& r) {
@@ -48,32 +97,38 @@ using Either_t = typename Either<A, B>::type;
 
 template<typename A, typename B, template<typename, typename> typename Combinator = Combine>
 Parser<typename Combinator<A, B>::type> operator & (Parser<A> const& pa, Parser<B> const& pb) {
-    return [&] (Token const& t) { 
-        auto a = pa(t);
-        auto b = pb(t);
+    return [&] (TokenIterator& it) -> Result<typename Combinator<A, B>::type> { 
+        auto a = pa(it);
+        auto b = pb(it);
         if (has_failed(a) || has_failed(b))
             return ParserError::error();
-        return Combinator<A, B>::combine(std::move(a), std::move(b));
+        return Combinator<A, B>::combine(std::move(std::get<A>(a)), std::move(std::get<B>(b)));
     };
 }
 
 template<typename A, typename B, template<typename, typename> typename Combinator = Either>
 Parser<typename Combinator<A, B>::type> operator | (Parser<A> const& pa, Parser<B> const& pb) {
-    return [&] (Token const& t) { 
-        auto a = pa(t);
-        if (!has_failed(a))
+    return [&] (TokenIterator& it) { 
+        auto it_a = it;
+        auto a = pa(it_a);
+        if (!has_failed(a)) {
+            it = it_a;
             return Combinator<A, B>::left(std::move(a));
-        auto b = pb(t);
-        if (!has_failed(b))
+        }
+        auto it_b = it;
+        auto b = pb(it_b);
+        if (!has_failed(b)) {
+            it = it_b;
             return Combinator<A, B>::right(std::move(b));
+        }
         return ParserError::error();
     };
 }
 
 template<typename T, typename F>
 Parser<std::invoke_result_t<F, T>> map(F && f, Parser<T> p) {
-    return [&] (Token const& t) -> Result<std::invoke_result_t<F, T>> {
-        auto r = p(t);
+    return [&] (TokenIterator& it) -> Result<std::invoke_result_t<F, T>> {
+        auto r = p(it);
         if (has_failed(r)) 
             return std::get<ParserError>(r);
         return std::forward<F&&>(f)(std::move(std::get<T>(r)));
@@ -82,11 +137,11 @@ Parser<std::invoke_result_t<F, T>> map(F && f, Parser<T> p) {
 
 template<std::size_t... Is, typename T, typename F>
 Parser<std::invoke_result_t<F, T>> mapI_impl(std::index_sequence<Is...>, F && f, Parser<T> p) {
-    return [&] (Token const& t) -> Result<std::invoke_result_t<F, T>> {
-        auto r = p(t);
+    return [&] (TokenIterator& it) -> Result<std::invoke_result_t<F, T>> {
+        auto r = p(it);
         if (has_failed(r)) 
             return std::get<ParserError>(r);
-        return std::forward<F&&>(f)(std::move(std::get<Is>(t))...);
+        return std::forward<F&&>(f)(std::move(std::get<Is>(r))...);
     };
 }
 
@@ -95,19 +150,35 @@ Parser<std::invoke_result_t<F, T>> mapI(F && f, Parser<T> p) {
     return mapI_impl(std::make_index_sequence<I>{}, std::forward<F&&>(f), p);
 }
 
+Parser<Token> eat(TokenType type, TokenSubType subtype) {
+    return [=] (TokenIterator& it) -> Result<Token> {
+        auto t = *it;
+        if (t.type == type && t.subtype == subtype) {
+            ++it;
+            return t;
+        }
+        return ParserError::error();
+    };
+}
+
+/*
+template<typename T>
+Parser<std::vector<T>> many(Parser<T> p) {
+    std::vector<T> res;
+    auto f = [p, &res] (Token const& t) {
+        auto r = p(t);
+        if (has_failed(r))
+            return res;
+        res.emplace_back(std::move(std::get<T>(r)));
+        return f;
+    };
+}*/
+
 template<typename T>
 ParserResult to_result(Result<T> r) {
     if (has_failed(r))
         return std::get<ParserError>(r);
     return std::move(std::get<T>(r));
-}
-
-Parser<Token> eat(TokenType type, TokenSubType subtype) {
-    return [=] (Token const& t) -> Result<Token> {
-        if (t.type == type && t.subtype == subtype)
-            return t;
-        return ParserError::error();
-    };
 }
 
 class ParserSource {
@@ -157,19 +228,19 @@ ParserResult parse(std::vector<Token> const& tokens) {
 
 ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens) {
     //ParserSource parser(tokens, index++);
-//    auto& token = tokens.at(index++);
+    auto& token = tokens.at(index++);
 
 
     //auto token = parser.eat(TokenType::Literal, TokenSubType::Float);
 
-/*
+
     if (token.type != TokenType::Literal || token.subtype != TokenSubType::Float)
         return ParserError::expected({"number litteral"});
 
     return std::make_unique<Number>(
         token.content
     );
-*/
+
 /*
     if (std::holds_alternative<ParserError>(token))
         return std::get<ParserError>(token);
@@ -185,15 +256,12 @@ ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens) 
     return to_result(std::move(number));  
     */
 
-    auto token_num = eat(TokenType::Literal, TokenSubType::Float);
-    auto num_parser = map([] (Token const& t) {
-        return std::make_unique<Number>(
-            t.content
-        );
-    }, token_num);
-    return to_result(std::move(num_parser(tokens[index++])));
+    //return to_result(std::move(num_parser(tokens[index++])));
   
 }
+
+    template<typename...Args>
+    class A;
 
 ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens) {
 
@@ -203,11 +271,34 @@ ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens) {
             t.content
         );
     }, token_num);
+
+    auto token_sub = eat(TokenType::Operator, TokenSubType::Minus);
+    auto sub_parser = map([] (std::pair<Token, Token> t) {
+        return std::make_unique<UnaryOperator>(
+            t.first.content,
+            std::make_unique<Number>(t.second.content)
+        );
+    }, token_sub & token_num);
+
+    auto term_parser = sub_parser | num_parser;
+
+    TokenIterator it(tokens.begin() + index, tokens.end());
+    auto res = term_parser(it);
+    index = std::distance(tokens.begin(), it.get());
+
+    if (has_failed(res))
+        return std::get<ParserError>(res);
+
+    auto var = std::get<std::variant<std::unique_ptr<UnaryOperator>, std::unique_ptr<Number>>>(res);
     
-
-
-
-/*
+    //A<decltype(res)> _;
+    
+    return std::visit(
+        [] (auto a) -> std::unique_ptr<AST> { return std::move(a); },
+        std::move(var)
+    );
+    /*
+    
     auto& token = tokens.at(index);
 
     switch(token.type) {
