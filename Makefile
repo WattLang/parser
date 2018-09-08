@@ -184,15 +184,15 @@ export LD_LIBRARY_PATH += $(_LIB_PATH_LD)
 
 all:
 ifneq ($(findstring $(TARGET_EXE),$(TARGET_ALL)),)
-	@make executable
+	@$(MAKE) executable
 endif
 
 executable: 
 	@$(call _header,BUILDING EXECUTABLE...)
-	@make $(TARGET_EXE)
+	@$(MAKE) $(TARGET_EXE)
 
 test:
-	@make PROJECT_NAME=parser_test SRC_MAIN=test.cpp
+	@$(MAKE) PROJECT_NAME=parser_test SRC_MAIN=test.cpp
 
 clean:
 	@$(call _header,REMOVING $(BUILD_FOLDER))
@@ -202,37 +202,37 @@ where-executable:
 	@echo $(TARGET_EXE)
 
 re:
-	@make clean
-	@make
+	@$(MAKE) clean
+	@$(MAKE)
 
 re-test:
-	@make re PROJECT_NAME=parser_test SRC_MAIN=test.cpp
+	@$(MAKE) re PROJECT_NAME=parser_test SRC_MAIN=test.cpp
 
 run:
-	@make executable
+	@$(MAKE) executable
 	@echo
 	@$(call _special,EXECUTING $(TARGET_EXE)...)
 	@$(TARGET_EXE) $(args); ERR=$$?; $(call _special,PROGRAM HALT WITH CODE $$ERR); exit $$ERR;
 
 run-test:
-	@make run PROJECT_NAME=parser_test SRC_MAIN=test.cpp
+	@$(MAKE) run PROJECT_NAME=parser_test SRC_MAIN=test.cpp
 
 re-run:
-	@make re
-	@make run
+	@$(MAKE) re
+	@$(MAKE) run
 
 re-run-test:
-	@make re-run PROJECT_NAME=parser_test SRC_MAIN=test.cpp
+	@$(MAKE) re-run PROJECT_NAME=parser_test SRC_MAIN=test.cpp
 
 valgrind:
-	@make executable
+	@$(MAKE) executable
 	@echo
 	@$(call _special,EXECUTING $(TARGET_EXE) WITH VALGRIND...)
 	@valgrind $(TARGET_EXE) $(args); ERR=$$?; $(call _special,PROGRAM HALT WITH CODE $$ERR); exit $$ERR;
 
 re-valgrind:
-	@make re-executable
-	@make valgrind
+	@$(MAKE) re-executable
+	@$(MAKE) valgrind
 
 $(_BUILD_DIR):
 	@mkdir -p $(_BUILD_DIR)
