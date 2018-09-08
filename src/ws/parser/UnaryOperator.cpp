@@ -11,4 +11,11 @@ nlohmann::json UnaryOperator::compile() const {
     };
 }
 
+std::ostream& UnaryOperator::dump(std::ostream& os) const {
+    std::string symbol = '<' + name + '>';
+    if (name == "negate") symbol = "-";
+
+    return os << symbol << *operand;
+}
+
 }

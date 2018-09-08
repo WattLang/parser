@@ -11,6 +11,8 @@ public:
 
     nlohmann::json compile() const override;
 
+    std::ostream& dump(std::ostream& os) const override;
+
 private:
 
     std::string value;

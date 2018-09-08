@@ -4,6 +4,7 @@
 #include <ws/parser/Number.hpp>
 #include <ws/parser/BinaryOperator.hpp>
 #include <ws/parser/UnaryOperator.hpp>
+#include <module/module.h>
 
 #include <iostream>
 #include <tuple>
@@ -24,6 +25,10 @@ public:
         return begin;
     }
 
+    bool is_end_of_stream() const {
+        return begin == end;
+    }
+
     Token const& operator*() const {
         if (begin != end)
             return *begin;
@@ -31,9 +36,7 @@ public:
     }
 
     Token const* operator->() const {
-        if (begin != end)
-            return &*begin;
-        throw std::out_of_range("ouch");
+        return &**this;
     }
 
     TokenIterator& operator++() {
@@ -74,16 +77,52 @@ bool has_failed(Result<T> const& r) {
     return std::holds_alternative<ParserError>(r);
 }
 
+template<typename T>
+Parser<T> try_(Parser<T> const& p) {
+    return [=] (TokenIterator& it) -> Result<T> {
+        try {
+            auto backup = it;
+            auto res = p(backup);
+            if (!has_failed(res)) {
+                it = backup;
+            }
+            return std::move(res);
+        } catch (std::out_of_range&) {
+            return ParserError::error();
+        }
+    };
+}
+
+template<typename T>
+struct is_tuple : std::bool_constant<false> {};
+
+template<typename...Ts>
+struct is_tuple<std::tuple<Ts...>> : std::bool_constant<true> {};
+
+template<typename T>
+constexpr auto is_tuple_v = is_tuple<T>::value;
+
+template<typename A, typename B, bool = is_tuple_v<A>, bool = is_tuple_v<B>>
+struct Combine;
+
 template<typename A, typename B>
-struct Combine {
+struct Combine<A, B, false, false> {
     using type = std::tuple<A, B>;
     static type combine(A a, B b) {
         return type { std::move(a), std::move(b) };
     }
 };
 
+template<typename...Args, typename...Brgs>
+struct Combine<std::tuple<Args...>, std::tuple<Brgs...>, true, true> {
+    using type = std::tuple<Args..., Brgs...>;
+    static type combine(std::tuple<Args...> a, std::tuple<Brgs...> b) {
+        return type { std::move(std::get<Args>(a))..., std::move(std::get<Brgs>(b))... };
+    }
+};
+
 template<typename...Args, typename B>
-struct Combine<std::tuple<Args...>, B> {
+struct Combine<std::tuple<Args...>, B, true, false> {
     using type = std::tuple<Args..., B>;
     static type combine(std::tuple<Args...> a, B b) {
         return type { std::move(std::get<Args>(a))..., std::move(b) };
@@ -91,18 +130,10 @@ struct Combine<std::tuple<Args...>, B> {
 };
 
 template<typename...Args, typename B>
-struct Combine<B, std::tuple<Args...>> {
+struct Combine<B, std::tuple<Args...>, false, true> {
     using type = std::tuple<B, Args...>;
     static type combine(B b, std::tuple<Args...> a) {
         return type { std::move(b), std::move(std::get<Args>(a))... };
-    }
-};
-
-template<typename...Args, typename...Brgs>
-struct Combine<std::tuple<Args...>, std::tuple<Brgs...>> {
-    using type = std::tuple<Args..., Brgs...>;
-    static type combine(std::tuple<Args...> a, std::tuple<Brgs...> b) {
-        return type { std::move(std::get<Args>(a))..., std::move(std::get<Brgs>(b))... };
     }
 };
 
@@ -118,11 +149,6 @@ struct Either {
     static type right(B b) {
         return type { std::in_place_index<1>, std::move(b) };
     }
-    static std::enable_if_t<std::is_same_v<A, B>, A> join(type t) {
-        return std::visit([] (auto a) {
-            return std::move(a);
-        }, std::move(t));
-    }
 };
 
 template<typename A, typename B>
@@ -131,17 +157,14 @@ using Either_t = typename Either<A, B>::type;
 template<typename A, typename B, template<typename, typename> typename Combinator = Combine>
 Parser<typename Combinator<A, B>::type> operator & (Parser<A> pa, Parser<B> pb) {
     return [=] (TokenIterator& it) -> Result<typename Combinator<A, B>::type> { 
-        std::cerr << "operator &: pa(it)...\n";
         auto a = pa(it);
-        std::cerr << "operator &: pb(it)...\n";
-        auto b = pb(it);
-
-        std::cerr << "operator &: checking\n";
-        if (has_failed(a) || has_failed(b)) {
-            std::cerr << "operator &: failed\n";
+        if (has_failed(a))
             return ParserError::error();
-        }
-        std::cerr << "operator &: didn't failed\n";
+
+        auto b = pb(it);
+        if (has_failed(b))
+            return ParserError::error();
+
         return Combinator<A, B>::combine(std::move(std::get<A>(a)), std::move(std::get<B>(b)));
     };
 }
@@ -149,29 +172,16 @@ Parser<typename Combinator<A, B>::type> operator & (Parser<A> pa, Parser<B> pb) 
 template<typename A, typename B, template<typename, typename> typename Combinator = Either>
 Parser<typename Combinator<A, B>::type> operator | (Parser<A> pa, Parser<B> pb) {
     return [=] (TokenIterator& it) -> Result<typename Combinator<A, B>::type> { 
-        auto it_a = it;
-        std::cerr << "operator |: pa(it_a)\n";
-        try {
-            auto a = pa(it_a);
-            std::cerr << "operator |: checking a\n";
-            if (!has_failed(a)) {
-                std::cerr << "operator |: pa didn't failed\n";
-                it = it_a;
-                return Combinator<A, B>::left(std::move(std::get<A>(a)));
-            }
-        } catch(std::out_of_range&) {}
-        auto it_b = it;
-        std::cerr << "operator |: pb(it_b)\n";
-        try {
-            auto b = pb(it_b);
-            std::cerr << "operator |: checking b\n";
-            if (!has_failed(b)) {
-                std::cerr << "operator |: pb didn't failed\n";
-                it = it_b;
-                return Combinator<A, B>::right(std::move(std::get<B>(b)));
-            }
-        } catch(std::out_of_range&) {}
-        std::cerr << "operator |: failed\n";
+        auto a = try_(pa)(it);
+
+        if (!has_failed(a))
+            return Combinator<A, B>::left(std::move(std::get<A>(a)));
+
+        auto b = try_(pb)(it);
+
+        if (!has_failed(b))
+            return Combinator<A, B>::right(std::move(std::get<B>(b)));
+
         return ParserError::error();
     };
 }
@@ -179,14 +189,9 @@ Parser<typename Combinator<A, B>::type> operator | (Parser<A> pa, Parser<B> pb) 
 template<typename T, typename F>
 Parser<std::invoke_result_t<F, T>> map(F && f, Parser<T> p) {
     return [f, p] (TokenIterator& it) -> Result<std::invoke_result_t<F, T>> {
-        std::cerr << "map: pa(it)...\n";
         auto r = p(it);
-        std::cerr << "map: checking, index is " << r.index() << "\n";
-        if (has_failed(r)) {
-            std::cerr << "map: failed\n";
+        if (has_failed(r))
             return std::get<ParserError>(r);
-        }
-        std::cerr << "map: applying f on index " << r.index() << "\n";
         return f(std::move(std::get<T>(r)));
     };
 }
@@ -208,21 +213,12 @@ Parser<std::invoke_result_t<F, Ts...>> mapI(F && f, Parser<std::tuple<Ts...>> p)
 
 Parser<Token> eat(TokenType type, TokenSubType subtype) {
     return [=] (TokenIterator& it) -> Result<Token> {
-        std::cerr << "eat: get token...\n";
         auto t = *it;
-        std::cerr << "eat: checking\n";
-        std::cerr << "Wants [" << (int)type << ", " << (int)subtype << "] have [" << (int)t.type << ", " << (int)t.subtype << "]\n";
         if (t.type == type && t.subtype == subtype) {
             ++it;
-            std::cerr << "eat: advancing and returning [" << (int)type << ", " << (int)subtype << "]\n";
-            Result<Token> r = t;
-            std::cerr << "eat: index is " << r.index() << "\n";
-            return r;
+            return t;
         }
-        std::cerr << "eat: failed [" << (int)type << ", " << (int)subtype << "]\n";
-        Result<Token> r = ParserError::error();
-        std::cerr << "eat: index is " << r.index() << "\n";
-        return r;
+        return ParserError::error();
     };
 }
 
@@ -230,14 +226,10 @@ template<typename T>
 Parser<std::vector<T>> many(Parser<T> p) {
     return [=] (TokenIterator& it) {
         std::vector<T> res;
-        std::cerr << "many: starting...\n";
         while(true) {
-            auto r = p(it);
-            if (has_failed(r)) {
-                std::cerr << "many: p failed, returns " << res.size() << "\n";
+            auto r = try_(p)(it);
+            if (has_failed(r))
                 return res;
-            }
-            std::cerr << "many: +1\n";
             res.emplace_back(std::move(std::get<T>(r)));
         }
     };
@@ -261,6 +253,37 @@ Parser<std::vector<T>> some_vec(Parser<T> p) {
 template<typename T, typename...Ts>
 Parser<T> join (Parser<std::variant<T, Ts...>> parser) {
     return map([] (auto r) -> T { return std::visit([] (auto a) { return std::move(a); }, std::move(r)); }, parser);
+}
+
+template<typename T>
+Parser<T> log(std::string const& name, Parser<T> const& parser) {
+    return [=] (TokenIterator& it) {
+        ws::module::noticeln("• Begin <", name, ">");
+        auto res = parser(it);
+        if (has_failed(res)) {
+            ws::module::warnln("• <", name, "> failed: ", std::get<ParserError>(res).what());
+        } else {
+            ws::module::println(ws::module::colour::fg::green, ws::module::style::bold, "[O] ", ws::module::style::reset, "• <", name, "> succeed: "/*, std::get<T>(res)*/);
+        }
+        return std::move(res);
+    };
+}
+
+template<typename T>
+Parser<std::optional<T>> optional(Parser<T> const& p) {
+    return [=] (TokenIterator& it) -> Result<std::optional<T>> {
+        auto res = try_(p)(it);
+        if (has_failed(res))
+            return std::nullopt;
+        return std::optional<T>(std::move(std::get<T>(res)));
+    };
+}
+
+template<typename T>
+Parser<T> ref(Parser<T>& p) {
+    return [&] (TokenIterator& it) {
+        return std::move(p(it));
+    };
 }
 
 template<typename T>
@@ -294,52 +317,101 @@ public:
 };
 
 ParserResult parse(std::vector<Token> const& tokens) {
-    auto float_eater = eat(TokenType::Literal, TokenSubType::Float);
-    auto minus_eater = eat(TokenType::Operator, TokenSubType::Minus);
-    auto plus_eater = eat(TokenType::Operator, TokenSubType::Plus);
-    auto mult_eater = eat(TokenType::Operator, TokenSubType::Multiplication);
-    auto div_eater = eat(TokenType::Operator, TokenSubType::Division);
+    auto float_eater = log("float", eat(TokenType::Literal, TokenSubType::Float));
+    auto minus_eater = log("'-'", eat(TokenType::Operator, TokenSubType::Minus));
+    auto plus_eater = log("'+'", eat(TokenType::Operator, TokenSubType::Plus));
+    auto mult_eater = log("'*'", eat(TokenType::Operator, TokenSubType::Multiplication));
+    auto div_eater = log("'/'", eat(TokenType::Operator, TokenSubType::Division));
+    auto left_par_eater = log("'('", eat(TokenType::Parenthesis, TokenSubType::Left));
+    auto right_par_eater = log("')'", eat(TokenType::Parenthesis, TokenSubType::Right));
+
+    Parser<AST_ptr> low_binary_operation;
  
-    auto term_parser = mapI([] (std::vector<Token> tokens, Token number) -> AST_ptr {
-        AST_ptr term = std::make_unique<Number>(number.content);
-        for(auto t : tokens)
-            term = std::make_unique<UnaryOperator>(t.content, std::move(term));
-        return std::move(term);
-    }, many(minus_eater) & float_eater);
+    auto term_parser = map([] (std::variant<std::tuple<std::vector<Token>, Token>, std::tuple<Token, AST_ptr, Token>> expr) -> AST_ptr {
+        if (expr.index() == 0) {
+            auto& tokens = std::get<0>(expr);
+            AST_ptr term = std::make_unique<Number>(std::get<1>(tokens).content);
+            for(auto t : std::get<0>(tokens))
+                term = std::make_unique<UnaryOperator>("negate", std::move(term));
+            return std::move(term);
+        }
+        return std::move(std::get<1>(std::move(std::get<1>(expr))));
+    }, 
+        log("term := '-'* float | '(' expr ')'",
+            log("'-'* float", 
+                log("'-'*", many(minus_eater)) & 
+                float_eater) | 
+            log("'(' expr ')'", 
+                left_par_eater & 
+                log("", ref(low_binary_operation)) & 
+                right_par_eater
+            )
+        )
+    );
 
-    auto high_binary_operation = mapI([] (AST_ptr lhs, std::variant<Token, Token> op, AST_ptr rhs) -> AST_ptr {
-        auto name = std::visit([] (Token t) {
-            if (t.subtype == TokenSubType::Division)
-                return "division";
-            return "multiplication";
-        }, op);
-        return std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(rhs));
-    }, term_parser & ((mult_eater | div_eater) & term_parser));
+    auto high_binary_operation = mapI([] (AST_ptr lhs, std::vector<std::tuple<std::variant<Token, Token>, AST_ptr>> rhs) -> AST_ptr {
+        for(auto& t : rhs) {
+            auto name = std::visit([] (Token t) {
+                if (t.subtype == TokenSubType::Division)
+                    return "division";
+                return "multiplication";
+            }, std::get<0>(t));
+            lhs = std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(std::get<1>(t)));
+        }
+        return std::move(lhs);
+    }, 
+        log("high_binary := term (('*' | '/') term)*", 
+            term_parser & 
+            log("(('*' | '/') term)*", 
+                many(
+                    log("('*' | '/') term",
+                        log("'*' | '/'", mult_eater | div_eater) & 
+                        term_parser
+                    )
+                )
+            )
+        )
+    );
 
-    auto pass_high_binary_operation = join(high_binary_operation | term_parser);
+    low_binary_operation = mapI([] (AST_ptr lhs, std::vector<std::tuple<std::variant<Token, Token>, AST_ptr>> rhs) -> AST_ptr {
+        for(auto& t : rhs) {
+            auto name = std::visit([] (Token t) {
+                if (t.subtype == TokenSubType::Plus)
+                    return "plus";
+                return "subtract";
+            }, std::get<0>(t));
+            lhs = std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(std::get<1>(t)));
+        }
+        return std::move(lhs);
+    }, 
+        log("low_binary := high_binary (('-' | '+') high_binary)*", 
+            high_binary_operation & 
+            log("(('-' | '+') high_binary)*", 
+                many(
+                    log("('-' | '+') high_binary",
+                        log("'-' | '+'", minus_eater | plus_eater) & 
+                        high_binary_operation
+                    )
+                )
+            )
+        )
+    );
 
-    auto low_binary_operation = mapI([] (AST_ptr lhs, std::variant<Token, Token> op, AST_ptr rhs) -> AST_ptr {
-        auto name = std::visit([] (Token t) {
-            if (t.subtype == TokenSubType::Plus)
-                return "plus";
-            return "subtract";
-        }, op);
-        return std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(rhs));
-    }, pass_high_binary_operation & ((minus_eater | plus_eater) & pass_high_binary_operation));
-
-    auto pass_low_binary_operation = join(low_binary_operation | high_binary_operation);
+    auto expr = log("expr := low_binary", low_binary_operation);
 
     try {
         TokenIterator it(tokens.begin(), tokens.end());
         std::cerr << "Parsing...\n";
-        auto res = pass_low_binary_operation(it);
+        auto res = expr(it);
 
         std::cerr << "Checking...\n";
         if (has_failed(res))
             return std::get<ParserError>(res);
+        if (!it.is_end_of_stream())
+            return ParserError::expected({"end of stream"});
         std::cerr << "OK...\n";
             
-        std::cerr << "Returning...\n";
+        std::cerr << "Returning... " << *std::get<AST_ptr>(res) << '\n';
         return std::move(std::get<AST_ptr>(res));
 
     } catch(std::out_of_range const&) {

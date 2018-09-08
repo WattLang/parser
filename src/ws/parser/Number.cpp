@@ -11,4 +11,8 @@ nlohmann::json Number::compile() const {
     };
 }
 
+std::ostream& Number::dump(std::ostream& os) const {
+    return os << value;
+}
+
 }

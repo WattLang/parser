@@ -12,4 +12,14 @@ nlohmann::json BinaryOperator::compile() const {
     };
 }
 
+std::ostream& BinaryOperator::dump(std::ostream& os) const {
+    std::string symbol = '<' + name + '>';
+    if (name == "plus") symbol = "+";
+    else if (name == "subtract") symbol = "-";
+    else if (name == "multiplication") symbol = "*";
+    else if (name == "division") symbol = "/";
+
+    return os << '(' << *lhs << ' ' << symbol << ' ' << *rhs << ')';
+}
+
 }
