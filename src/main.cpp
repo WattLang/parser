@@ -54,18 +54,18 @@ std::vector<ws::parser::Token> parse_tokens(nlohmann::json const& json) {
         auto raw_type = json_token["type"].get<std::string>();
         auto types = split_type(raw_type);
         if (types.size() != 2) {
-            ws::module::println("Couldn't parse type ", raw_type);
+            ws::module::errorln("Couldn't parse type ", raw_type);
             return {};
         }
 
         auto type = parse_type(types[0]);
         auto subtype = parse_subtype(types[1]);
         if (!type) {
-            ws::module::println("Type ", types[0], " is not known");
+            ws::module::errorln("Type ", types[0], " is not known");
             return {};
         }
         if (!subtype) {
-            ws::module::println("Subtype ", types[1], " is not known");
+            ws::module::errorln("Subtype ", types[1], " is not known");
             return {};
         }
 
@@ -82,7 +82,7 @@ int main() {
     auto result = ws::parser::parse(tokens);
 
     if (ws::parser::is_error(result)) {
-        ws::module::warn(ws::parser::get_error(result)->what());
+        ws::module::errorln(ws::parser::get_error(result)->what());
         return 1;
     }
 
