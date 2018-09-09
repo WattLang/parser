@@ -63,7 +63,7 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool pri
     bool test_pass = !is_error(out) == parsable;
 
     if (test_pass)
-        ws::module::print(ws::module::colour::fg::green, ws::module::style::bold, "[O]", ws::module::style::reset, " OK");
+        ws::module::print(ws::module::colour::fg::green, ws::module::style::bold, "[_]", ws::module::style::reset, " OK");
     else
         ws::module::error("ERROR");
 
@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
     && CHECK_T( N(42), P, N(1337.5), P, N(666), P, S, S, N(1),  D, S, S, N(11));
 
     if (all_test)
-        ws::module::println(ws::module::colour::fg::green, ws::module::style::bold, "[O]", ws::module::style::reset, " Pass all tests");
+        ws::module::println(ws::module::colour::fg::green, ws::module::style::bold, "[_]", ws::module::style::reset, " Pass all tests");
     else
         ws::module::errorln("Error on tests");
 

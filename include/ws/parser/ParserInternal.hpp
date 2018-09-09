@@ -72,6 +72,9 @@ namespace ws::parser {
  * log (std::string, Parser<A>) -> Parser<A>
  *    Print a message when the parser is run, and when it succed/fail, returns the result of that parser, the type A need to implement operato<<(std::ostream&)
 
+ * log (std::size_t&, std::string, Parser<A>) -> Parser<A>
+ *    Equivalent of log but will use spaces to indent the code, it also increament it for the future logs
+
  * join (Parser<std::variant<A...>>) -> Parser<B>
  *    Run the parser and convert the result into B, All types in the variant need to be convertible to B
 
@@ -475,14 +478,40 @@ Parser<T> join (Parser<std::variant<T, Ts...>> const& parser) {
 template<typename T>
 Parser<T> log(std::string const& name, Parser<T> const& parser) {
     return [=] (TokenStream& it) {
-        ws::module::noticeln("• Begin <", name, ">");
+        ws::module::noticeln("• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
         auto res = parser(it);
         if (has_failed(res)) {
-            ws::module::warnln("• <", name, "> failed: ", std::get<ParserError>(res).what());
+            ws::module::warnln("• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", std::get<ParserError>(res).what());
         } else {
             ws::module::println(
-                ws::module::colour::fg::green, ws::module::style::bold, "[O] ", ws::module::style::reset, 
-                "• <", name, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
+                ws::module::colour::fg::green, ws::module::style::bold, "[_] ", ws::module::style::reset, 
+                "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
+        }
+        return std::move(res);
+    };
+}
+
+
+
+
+
+/*
+ * log (std::size_t&, std::string, Parser<A>) -> Parser<A>
+ *    Equivalent of log but will use spaces to indent the code, it also increament it for the future logs
+ */
+template<typename T>
+Parser<T> log(std::size_t& spaces, std::string const& name, Parser<T> const& parser) {
+    return [&spaces, name, parser] (TokenStream& it) {
+        ws::module::noticeln(std::string(spaces, ' '), "• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
+        spaces += 2;
+        auto res = parser(it);
+        spaces -= 2;
+        if (has_failed(res)) {
+            ws::module::warnln(std::string(spaces, ' '), "• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", std::get<ParserError>(res).what());
+        } else {
+            ws::module::println(
+                ws::module::colour::fg::green, ws::module::style::bold, "[_] ", std::string(spaces, ' '), ws::module::style::reset, 
+                "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
         }
         return std::move(res);
     };

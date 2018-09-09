@@ -63,54 +63,56 @@ ParserResult parse(std::vector<Token> const& tokens) {
      * term := '-' term | float | '(' expr ')'
      */
 
-    auto float_eater     = log("float", eat(TokenType::Literal,     TokenSubType::Float));
-    auto minus_eater     = log("'-'",   eat(TokenType::Operator,    TokenSubType::Minus));
-    auto plus_eater      = log("'+'",   eat(TokenType::Operator,    TokenSubType::Plus));
-    auto mult_eater      = log("'*'",   eat(TokenType::Operator,    TokenSubType::Multiplication));
-    auto div_eater       = log("'/'",   eat(TokenType::Operator,    TokenSubType::Division));
-    auto left_par_eater  = log("'('",   eat(TokenType::Parenthesis, TokenSubType::Left));
-    auto right_par_eater = log("')'",   eat(TokenType::Parenthesis, TokenSubType::Right));
+    std::size_t indent = 0;
+
+    auto float_eater     = log(indent, "float", eat(TokenType::Literal,     TokenSubType::Float));
+    auto minus_eater     = log(indent, "'-'",   eat(TokenType::Operator,    TokenSubType::Minus));
+    auto plus_eater      = log(indent, "'+'",   eat(TokenType::Operator,    TokenSubType::Plus));
+    auto mult_eater      = log(indent, "'*'",   eat(TokenType::Operator,    TokenSubType::Multiplication));
+    auto div_eater       = log(indent, "'/'",   eat(TokenType::Operator,    TokenSubType::Division));
+    auto left_par_eater  = log(indent, "'('",   eat(TokenType::Parenthesis, TokenSubType::Left));
+    auto right_par_eater = log(indent, "')'",   eat(TokenType::Parenthesis, TokenSubType::Right));
 
     Parser<AST_ptr> expr;
     Parser<AST_ptr> term;
 
-    auto factor_operators = log(
+    auto factor_operators = log(indent, 
         "'*' | '/'",
         mult_eater | div_eater);
 
-    auto expr_operators = log(
+    auto expr_operators = log(indent, 
         "'+' | '-'",
         plus_eater | minus_eater);
 
-    auto term_negate = log(
+    auto term_negate = log(indent, 
         "'-' term", 
         minus_eater & ~term);
 
-    auto term_parentherized_expr = log(
+    auto term_parentherized_expr = log(indent, 
         "'(' expr ')'", 
         left_par_eater > ~expr < right_par_eater);
 
-    term = log("term as AST", map(term_to_AST, log(
+    term = log(indent, "term as AST", map(term_to_AST, log(indent, 
         "term := '-' term | float | '(' expr ')'", 
         term_negate | float_eater | term_parentherized_expr)));
 
-    auto factor_rhs = log(
+    auto factor_rhs = log(indent, 
         "(('*' | '/') term)*",
-        many(log(
+        many(log(indent, 
             "('*' | '/') term", 
             factor_operators & term)));
 
-    auto factor = log("factor as AST", mapI(factor_to_AST, log(
+    auto factor = log(indent, "factor as AST", mapI(factor_to_AST, log(indent, 
         "factor := term (('*' | '/') term)*",
         term & factor_rhs)));
 
-    auto expr_rhs = log(
+    auto expr_rhs = log(indent, 
         "(('+' | '-') factor)*",
-        many(log(
+        many(log(indent, 
             "('+' | '-') factor", 
             expr_operators & factor)));
 
-    expr = log("expr as AST", mapI(expr_to_AST, log(
+    expr = log(indent, "expr as AST", mapI(expr_to_AST, log(indent, 
         "expr := factor (('+' | '-') factor)*",
         factor & expr_rhs)));
 
