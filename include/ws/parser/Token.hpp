@@ -17,4 +17,8 @@ public:
 
 };
 
+inline std::ostream& operator<<(std::ostream& os, Token const& token) {
+    return os << "{" << token.content << " : " << token.type << "." << token.subtype << "}";
+}
+
 }
