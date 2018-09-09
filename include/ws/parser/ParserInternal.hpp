@@ -13,6 +13,70 @@
 
 namespace ws::parser {
 
+/* Parser Combinator:
+ * -> Build bigger parser from smaller one
+
+ *    Parser<T> = Result<T> (TokenStream&)
+ *    Result<T> = ParserError or T
+
+ * Parser:
+
+ * eat (TokenType, TokenSubType) -> Parser<Token>
+ *    Comsume the next token of the stream if the type/subtype match, or returns an error, the stream is always comsumed
+
+ * try_ (Parser<A>) -> Parser<A>
+ *    Try to run the parser, if it fails rollback the stream where it was, still returns what the parser returned
+
+ * operator & (Parser<A>, Parser<B>) -> Parser<std::tuple<A, B>>
+ *    Run sequencially both parser, returns their result in a tuple, or an error
+ *    Note:
+ *        If A or B is a tuple, it will concatenate the tuple
+ *        So operator & (Parser<std::tuple<A, B>>, Parser<std::tuple<C, A>>) -> Parser<std::tuple<A, B, C, A>>
+
+ * operator | (Parser<A>, Parser<B>) -> Parser<std::variant<A, B>>
+ *    Run the first parser, if it fails run the second parser, if it fails returns an error
+ *    Note:
+ *        If A or B is a variant, it will concatenate the variant
+ *        So operator | (Parser<std::variant<A, B>>, Parser<std::variant<C, A>>) -> Parser<std::variant<A, B, C, A>>
+
+ * many (Parser<A>) -> Parser<std::vector<A>>
+ *    Accumulate the result of the parser until it fails, this parser never fails, since it can returns an empty vector
+
+ * some (Parser<A>) -> Parser<std::tuple<A, std::vector<A>>>
+ *    Combination of itself and many, will parse A at least once, if the first iteration fails, an error is resturned
+
+ * operator ~ (Parser<A>) -> Parser<A>
+ *    Equivalent of 'ref'
+
+ * operator < (Parser<A>, Parser<B>) -> Parser<A>
+ *    Equivalent of 'a & b' but discard the second result
+
+ * operator > (Parser<A>, Parser<B>) -> Parser<B>
+ *    Equivalent of 'a & b' but discard the first result
+
+ * optional (Parser<A>) -> Parser<std::optional<A>>
+ *    Run the parser, if it fails return an empty optional, can't fail
+
+ * ref (Parser<A>) -> Parser<A>
+ *    By default parser are copied, but when you need recursion, you have to declare the parser first then referenced it with ref(parser)
+ *    Example:
+ *        Parser<Thing> parenthesis_expr;
+ *        parenthesis_expr = left_par & ref(parenthesis_expr) & right_par | expr;
+
+ * map (B(A), Parser<A>) -> Parser<B>
+ *    Run the callback on the result of the parser if it has succeeded
+
+ * mapI (X(A...), Parser<std::tuple<A...>>) -> Parser<B>
+ *    Equivalent of 'map' but unpack each element of a tuple
+
+ * log (std::string, Parser<A>) -> Parser<A>
+ *    Print a message when the parser is run, and when it succed/fail, returns the result of that parser, the type A need to implement operato<<(std::ostream&)
+
+ * join (Parser<std::variant<A...>>) -> Parser<B>
+ *    Run the parser and convert the result into B, All types in the variant need to be convertible to B
+
+ */
+
 template<typename T>
 using Result = std::variant<ParserError, T>;
 
