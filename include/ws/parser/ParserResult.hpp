@@ -6,7 +6,7 @@
 #include <optional>
 #include <memory>
 
-#include <ws/parser/AST.hpp>
+#include <ws/parser/ast/AST.hpp>
 
 namespace ws::parser {
 

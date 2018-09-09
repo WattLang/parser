@@ -1,9 +1,9 @@
 #include <ws/parser/Parser.hpp>
 
-#include <ws/parser/AST.hpp>
-#include <ws/parser/Number.hpp>
-#include <ws/parser/BinaryOperator.hpp>
-#include <ws/parser/UnaryOperator.hpp>
+#include <ws/parser/ast/AST.hpp>
+#include <ws/parser/ast/Number.hpp>
+#include <ws/parser/ast/BinaryOperator.hpp>
+#include <ws/parser/ast/UnaryOperator.hpp>
 #include <module/module.h>
 
 #include <iostream>

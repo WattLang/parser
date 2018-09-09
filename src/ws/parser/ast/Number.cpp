@@ -1,4 +1,4 @@
-#include <ws/parser/Number.hpp>
+#include <ws/parser/ast/Number.hpp>
 
 namespace ws::parser {
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ws/parser/AST.hpp>
+#include <ws/parser/ast/AST.hpp>
 
 namespace ws::parser {
 

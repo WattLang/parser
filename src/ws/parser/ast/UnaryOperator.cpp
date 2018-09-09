@@ -1,4 +1,4 @@
-#include <ws/parser/UnaryOperator.hpp>
+#include <ws/parser/ast/UnaryOperator.hpp>
 
 namespace ws::parser {
 

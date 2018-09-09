@@ -1,4 +1,4 @@
-#include <ws/parser/BinaryOperator.hpp>
+#include <ws/parser/ast/BinaryOperator.hpp>
 
 namespace ws::parser {
 
