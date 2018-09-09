@@ -87,14 +87,70 @@ struct Combine<B, std::tuple<Args...>, false, true> {
 template<typename A, typename B>
 using Combine_t = typename Combine<A, B>::type;
 
+template<typename T>
+struct is_variant : std::bool_constant<false> {};
+
+template<typename...Ts>
+struct is_variant<std::variant<Ts...>> : std::bool_constant<true> {};
+
+template<typename T>
+constexpr auto is_variant_v = is_variant<T>::value;
+
+template<typename V, std::size_t I, size_t Offset, typename...Ts>
+V create_variant(std::variant<Ts...>&& v) {
+    if constexpr (I + 1 < sizeof...(Ts))
+        if (v.index() != I)
+            return create_variant<V, I + 1, Offset, Ts...>(std::move(v));
+    return V { std::in_place_index<I + Offset>, std::move(std::get<I>(v)) };
+}
+
+template<typename A, typename B, bool = is_variant_v<A>, bool = is_variant_v<B>>
+struct Either;
+
 template<typename A, typename B>
-struct Either {
+struct Either<A, B, false, false> {
     using type = std::variant<A, B>;
     static type left(A&& a) {
         return type { std::in_place_index<0>, std::move(a) };
     }
     static type right(B&& b) {
         return type { std::in_place_index<1>, std::move(b) };
+    }
+};
+
+template<typename...Args, typename B>
+struct Either<std::variant<Args...>, B, true, false> {
+    using type = std::variant<Args..., B>;
+
+    static type left(std::variant<Args...>&& a) {
+        return create_variant<type, 0, 0, Args...>(std::move(a));
+    }
+    static type right(B&& b) {
+        return type { std::in_place_index<sizeof...(Args)>, std::move(b) };
+    }
+};
+
+template<typename A, typename...Brgs>
+struct Either<A, std::variant<Brgs...>, false, true> {
+    using type = std::variant<A, Brgs...>;
+
+    static type left(A&& a) {
+        return type { std::in_place_index<0>, std::move(a) };
+    }
+    static type right(std::variant<Brgs...>&& b) {
+        return create_variant<type, 0, 1, Brgs...>(std::move(b));
+    }
+};
+
+template<typename...Args, typename...Brgs>
+struct Either<std::variant<Args...>, std::variant<Brgs...>, true, true> {
+    using type = std::variant<Args..., Brgs...>;
+
+    static type left(std::variant<Args...>&& a) {
+        return create_variant<type, 0, 0, Args...>(std::move(a));
+    }
+    static type right(std::variant<Brgs...>&& b) {
+        return create_variant<type, 0, sizeof...(Args), Brgs...>(std::move(b));
     }
 };
 
@@ -266,6 +322,22 @@ Parser<T> ref(Parser<T> const& p) {
     return [&p] (TokenStream& it) {
         return std::move(p(it));
     };
+}
+
+template<typename T>
+Parser<T> operator~(Parser<T> const& p) {
+    return ref(p);
+}
+
+template<typename A, typename B>
+Parser<B> operator > (Parser<A> const& pa, Parser<B> const& pb) {
+    return mapI([] (auto, auto res) { return res; }, pa & pb);
+}
+
+
+template<typename A, typename B>
+Parser<A> operator < (Parser<A> const& pa, Parser<B> const& pb) {
+    return mapI([] (auto res, auto) { return res; }, pa & pb);
 }
 
 }

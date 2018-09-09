@@ -17,88 +17,102 @@ ParserResult to_result(Result<T> r) {
     return std::move(std::get<T>(r));
 }
 
+AST_ptr term_to_AST(std::variant<std::tuple<Token, AST_ptr>, Token, /*std::tuple<Token, AST_ptr, Token>>*/ AST_ptr> expr) {
+    switch(expr.index()) {
+    case 0: // std::tuple<Token, AST_ptr>
+        return std::make_unique<UnaryOperator>("negate", std::move(std::get<1>(std::get<0>(expr))));
+    case 1: // Token
+        return std::make_unique<Number>(std::get<1>(expr).content);
+    case 2: // std::tuple<Token, AST_ptr, Token>
+        return std::move(std::get<2>(expr));
+    default:
+        ws::module::errorln("WTF ? term_to_AST::expr should have an index of 0, 1 or 2... What is going on ?");
+        return nullptr;
+    }
+}
+
+AST_ptr factor_to_AST(AST_ptr lhs, std::vector<std::tuple<std::variant<Token, Token>, AST_ptr>> rhs) {
+    for(auto& t : rhs) {
+        auto name = std::visit([] (Token t) {
+            if (t.subtype == TokenSubType::Division)
+                return "division";
+            return "multiplication";
+        }, std::get<0>(t));
+        lhs = std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(std::get<1>(t)));
+    }
+    return std::move(lhs);
+}
+
+AST_ptr expr_to_AST(AST_ptr lhs, std::vector<std::tuple<std::variant<Token, Token>, AST_ptr>> rhs) {
+    for(auto& t : rhs) {
+        auto name = std::visit([] (Token t) {
+            if (t.subtype == TokenSubType::Plus)
+                return "plus";
+            return "subtract";
+        }, std::get<0>(t));
+        lhs = std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(std::get<1>(t)));
+    }
+    return std::move(lhs);
+}
+
 ParserResult parse(std::vector<Token> const& tokens) {
-    auto float_eater = log("float", eat(TokenType::Literal, TokenSubType::Float));
-    auto minus_eater = log("'-'", eat(TokenType::Operator, TokenSubType::Minus));
-    auto plus_eater = log("'+'", eat(TokenType::Operator, TokenSubType::Plus));
-    auto mult_eater = log("'*'", eat(TokenType::Operator, TokenSubType::Multiplication));
-    auto div_eater = log("'/'", eat(TokenType::Operator, TokenSubType::Division));
-    auto left_par_eater = log("'('", eat(TokenType::Parenthesis, TokenSubType::Left));
-    auto right_par_eater = log("')'", eat(TokenType::Parenthesis, TokenSubType::Right));
 
-    Parser<AST_ptr> low_binary_operation;
+    /*
+     * expr := factor  (('-' | '+') factor)*
+     * factor := term (('*' | '/') term)*
+     * term := '-' term | float | '(' expr ')'
+     */
 
-    auto term_parser = map([] (std::variant<std::tuple<std::vector<Token>, Token>, std::tuple<Token, AST_ptr, Token>> expr) -> AST_ptr {
-        if (expr.index() == 0) {
-            auto& tokens = std::get<0>(expr);
-            AST_ptr term = std::make_unique<Number>(std::get<1>(tokens).content);
-            for(auto t : std::get<0>(tokens))
-                term = std::make_unique<UnaryOperator>("negate", std::move(term));
-            return std::move(term);
-        }
-        return std::move(std::get<1>(std::move(std::get<1>(expr))));
-    }, 
-        log("term := '-'* float | '(' expr ')'",
-            log("'-'* float", 
-                log("'-'*", many(minus_eater)) & 
-                float_eater) | 
-            log("'(' expr ')'", 
-                left_par_eater & 
-                log("expr", ws::parser::ref(low_binary_operation)) & 
-                right_par_eater
-            )
-        )
-    );
+    auto float_eater     = log("float", eat(TokenType::Literal,     TokenSubType::Float));
+    auto minus_eater     = log("'-'",   eat(TokenType::Operator,    TokenSubType::Minus));
+    auto plus_eater      = log("'+'",   eat(TokenType::Operator,    TokenSubType::Plus));
+    auto mult_eater      = log("'*'",   eat(TokenType::Operator,    TokenSubType::Multiplication));
+    auto div_eater       = log("'/'",   eat(TokenType::Operator,    TokenSubType::Division));
+    auto left_par_eater  = log("'('",   eat(TokenType::Parenthesis, TokenSubType::Left));
+    auto right_par_eater = log("')'",   eat(TokenType::Parenthesis, TokenSubType::Right));
 
-    auto high_binary_operation = mapI([] (AST_ptr lhs, std::vector<std::tuple<std::variant<Token, Token>, AST_ptr>> rhs) -> AST_ptr {
-        for(auto& t : rhs) {
-            auto name = std::visit([] (Token t) {
-                if (t.subtype == TokenSubType::Division)
-                    return "division";
-                return "multiplication";
-            }, std::get<0>(t));
-            lhs = std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(std::get<1>(t)));
-        }
-        return std::move(lhs);
-    }, 
-        log("high_binary := term (('*' | '/') term)*", 
-            term_parser & 
-            log("(('*' | '/') term)*", 
-                many(
-                    log("('*' | '/') term",
-                        log("'*' | '/'", mult_eater | div_eater) & 
-                        term_parser
-                    )
-                )
-            )
-        )
-    );
+    Parser<AST_ptr> expr;
+    Parser<AST_ptr> term;
 
-    low_binary_operation = mapI([] (AST_ptr lhs, std::vector<std::tuple<std::variant<Token, Token>, AST_ptr>> rhs) -> AST_ptr {
-        for(auto& t : rhs) {
-            auto name = std::visit([] (Token t) {
-                if (t.subtype == TokenSubType::Plus)
-                    return "plus";
-                return "subtract";
-            }, std::get<0>(t));
-            lhs = std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(std::get<1>(t)));
-        }
-        return std::move(lhs);
-    }, 
-        log("low_binary := high_binary (('-' | '+') high_binary)*", 
-            high_binary_operation & 
-            log("(('-' | '+') high_binary)*", 
-                many(
-                    log("('-' | '+') high_binary",
-                        log("'-' | '+'", minus_eater | plus_eater) & 
-                        high_binary_operation
-                    )
-                )
-            )
-        )
-    );
+    auto factor_operators = log(
+        "'*' | '/'",
+        mult_eater | div_eater);
 
-    auto expr = log("expr := low_binary", low_binary_operation);
+    auto expr_operators = log(
+        "'+' | '-'",
+        plus_eater | minus_eater);
+
+    auto term_negate = log(
+        "'-' term", 
+        minus_eater & ~term);
+
+    auto term_parentherized_expr = log(
+        "'(' expr ')'", 
+        left_par_eater > ~expr < right_par_eater);
+
+    term = log("term as AST", map(term_to_AST, log(
+        "term := '-' term | float | '(' expr ')'", 
+        term_negate | float_eater | term_parentherized_expr)));
+
+    auto factor_rhs = log(
+        "(('*' | '/') term)*",
+        many(log(
+            "('*' | '/') term", 
+            factor_operators & term)));
+
+    auto factor = log("factor as AST", mapI(factor_to_AST, log(
+        "factor := term (('*' | '/') term)*",
+        term & factor_rhs)));
+
+    auto expr_rhs = log(
+        "(('+' | '-') factor)*",
+        many(log(
+            "('+' | '-') factor", 
+            expr_operators & factor)));
+
+    expr = log("expr as AST", mapI(expr_to_AST, log(
+        "expr := factor (('+' | '-') factor)*",
+        factor & expr_rhs)));
 
     try {
         TokenStream it(tokens.begin(), tokens.end());
