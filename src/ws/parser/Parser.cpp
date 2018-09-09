@@ -66,6 +66,7 @@ private:
     iterator begin, end;
 
 };
+
 template<typename T>
 using Result = std::variant<ParserError, T>;
 
@@ -282,7 +283,15 @@ std::ostream& operator<<(std::ostream& os, std::vector<T> const& vector) {
 
 template<typename T>
 std::ostream& operator<<(std::ostream& os, std::unique_ptr<T> const& ptr) {
-    return os << *ptr;
+    return os << "*" << *ptr;
+}
+
+
+template<typename T>
+std::ostream& operator<<(std::ostream& os, std::optional<T> const& opt) {
+    if (opt)
+        return os << "$" << *opt;
+    return os << "$null";
 }
 
 template<typename...Ts>
@@ -439,17 +448,12 @@ ParserResult parse(std::vector<Token> const& tokens) {
 
     try {
         TokenIterator it(tokens.begin(), tokens.end());
-        std::cerr << "Parsing...\n";
         auto res = expr(it);
-
-        std::cerr << "Checking...\n";
         if (has_failed(res))
             return std::get<ParserError>(res);
         if (!it.is_end_of_stream())
             return ParserError::expected({"end of stream"});
-        std::cerr << "OK...\n";
             
-        std::cerr << "Returning... " << *std::get<AST_ptr>(res) << '\n';
         return std::move(std::get<AST_ptr>(res));
 
     } catch(std::out_of_range const&) {
