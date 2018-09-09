@@ -236,10 +236,10 @@ Parser<std::vector<T>> many(Parser<T> p) {
 }
 
 template<typename T>
-Parser<std::pair<T, std::vector<T>>> some(Parser<T> p) {
+Parser<std::tuple<T, std::vector<T>>> some(Parser<T> p) {
     return p & many(p);
 }
-
+/*
 template<typename T>
 Parser<std::vector<T>> some_vec(Parser<T> p) {
     return map([] (std::pair<T, std::vector<T>> p) {
@@ -249,10 +249,46 @@ Parser<std::vector<T>> some_vec(Parser<T> p) {
         return vec;
     }, some(p));
 }
-
+*/
 template<typename T, typename...Ts>
 Parser<T> join (Parser<std::variant<T, Ts...>> parser) {
     return map([] (auto r) -> T { return std::visit([] (auto a) { return std::move(a); }, std::move(r)); }, parser);
+}
+
+template<typename...Ts, std::size_t...Is>
+std::ostream& print_tuple(std::ostream& os, std::tuple<Ts...> const& tuple, std::index_sequence<Is...>) {
+    (std::initializer_list<int>){((os << (Is == 0 ? "" : ", ") << std::get<Is>(tuple)), 0)...};
+    return os;
+}
+
+template<typename...Ts>
+std::ostream& operator<<(std::ostream& os, std::tuple<Ts...> const& tuple) {
+    os << "<";
+    return print_tuple(os, tuple, std::make_index_sequence<sizeof...(Ts)>()) << ">";
+}
+
+template<typename T>
+std::ostream& operator<<(std::ostream& os, std::vector<T> const& vector) {
+    bool first = true;
+    os << "[";
+    for(auto const& t : vector) {
+        if (!first)
+            os << ", ";
+        os << t;
+        first = false;
+    }
+    return os << "]";
+}
+
+template<typename T>
+std::ostream& operator<<(std::ostream& os, std::unique_ptr<T> const& ptr) {
+    return os << *ptr;
+}
+
+template<typename...Ts>
+std::ostream& operator<<(std::ostream& os, std::variant<Ts...> const& variant) {
+    os << "|" << variant.index() << ": ";
+    return std::visit([&os] (auto const& v) -> std::ostream& { return os << v; }, variant) << "|";
 }
 
 template<typename T>
@@ -263,7 +299,9 @@ Parser<T> log(std::string const& name, Parser<T> const& parser) {
         if (has_failed(res)) {
             ws::module::warnln("• <", name, "> failed: ", std::get<ParserError>(res).what());
         } else {
-            ws::module::println(ws::module::colour::fg::green, ws::module::style::bold, "[O] ", ws::module::style::reset, "• <", name, "> succeed: "/*, std::get<T>(res)*/);
+            ws::module::println(
+                ws::module::colour::fg::green, ws::module::style::bold, "[O] ", ws::module::style::reset, 
+                "• <", name, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
         }
         return std::move(res);
     };
