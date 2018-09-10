@@ -1,4 +1,4 @@
-#include <ws/parser/UnaryOperator.hpp>
+#include <ws/parser/ast/UnaryOperator.hpp>
 
 namespace ws::parser {
 
@@ -9,6 +9,13 @@ nlohmann::json UnaryOperator::compile() const {
         {"type", "operator." + name},
         {"operand", operand->compile() }
     };
+}
+
+std::ostream& UnaryOperator::dump(std::ostream& os) const {
+    std::string symbol = '<' + name + '>';
+    if (name == "negate") symbol = "-";
+
+    return os << symbol << *operand;
 }
 
 }

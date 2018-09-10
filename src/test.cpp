@@ -4,7 +4,7 @@
 
 #include <module/module.h>
 #include <ws/parser/Parser.hpp>
-#include <ws/parser/Token.hpp>
+#include <ws/parser/token/Token.hpp>
 
 ws::parser::Token number(float f) {
     return {std::to_string(f), ws::parser::TokenType::Literal, ws::parser::TokenSubType::Float};
@@ -26,6 +26,23 @@ ws::parser::Token sub() {
     return {"-", ws::parser::TokenType::Operator, ws::parser::TokenSubType::Minus};
 }
 
+ws::parser::Token left() {
+    return {"(", ws::parser::TokenType::Parenthesis, ws::parser::TokenSubType::Left};
+}
+
+ws::parser::Token right() {
+    return {")", ws::parser::TokenType::Parenthesis, ws::parser::TokenSubType::Right};
+}
+
+#define CHECK(parsable, print_ast, is...) check({ is }, parsable, print_ast)
+#define P plus()
+#define S sub()
+#define M mult()
+#define D div()
+#define L left()
+#define R right()
+#define N(n) number(n)
+
 bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool print_ast) {
     auto out = ws::parser::parse(tokens);
 
@@ -46,7 +63,7 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool pri
     bool test_pass = !is_error(out) == parsable;
 
     if (test_pass)
-        ws::module::print(ws::module::colour::fg::green, ws::module::style::bold, "[O]", ws::module::style::reset, " OK");
+        ws::module::print(ws::module::colour::fg::green, ws::module::style::bold, "[_]", ws::module::style::reset, " OK");
     else
         ws::module::error("ERROR");
 
@@ -64,32 +81,43 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool pri
 int main(int argc, char** argv) {
     bool print_ast = argc > 1 && std::string(argv[1]) == "--ast";
 
+#define CHECK_T(is...) CHECK(true, print_ast, is)
+#define CHECK_F(is...) CHECK(false, print_ast, is)
+
     bool all_test =
-        check({}, false, print_ast)
-    &&  check({number(42)}, true, print_ast)
-    &&  check({sub(), number(42)}, true, print_ast)
-    &&  check({sub()}, false, print_ast)
-    &&  check({sub(), sub(), sub(), number(42)}, true, print_ast)
-    &&  check({number(42), number(1337)}, false, print_ast)
-    &&  check({number(42), number(1337), number(666)}, false, print_ast)
-    &&  check({number(42), mult(), number(666)}, true, print_ast)
-    &&  check({number(42), mult(), number(666), sub()}, false, print_ast)
-    &&  check({number(42), mult(), sub(), number(666)}, true, print_ast)
-    &&  check({number(42), mult(), sub(), sub(), number(666)}, true, print_ast)
-    &&  check({sub(), number(42), mult(), number(666)}, true, print_ast)
-    &&  check({sub(), sub(), number(42), mult(), number(666)}, true, print_ast)
-    &&  check({number(42), sub(), number(666)}, true, print_ast)
-    &&  check({number(42), div(), number(666)}, true, print_ast)
-    &&  check({number(42), plus(), number(1337)}, true, print_ast)
-    &&  check({number(42), plus(), number(1337), div(), number(1337)}, true, print_ast)
-    &&  check({number(42), div(), number(1337), plus(), number(1337)}, true, print_ast)
-    &&  check({number(1337), plus(), number(42), div(), number(1337), plus(), number(1337)}, true, print_ast)
-    &&  check({number(42), div(), number(1337), plus(), number(1337), div(), number(1337)}, true, print_ast)
-    &&  check({plus(), number(42), plus(), number(1337)}, false, print_ast)
-    &&  check({number(42), plus(), div(), number(1337)}, false, print_ast);
+       CHECK_F()
+    && CHECK_T( N(42))
+    && CHECK_T( L, N(1), R)
+    && CHECK_F( L, N(1))
+    && CHECK_F( N(1), R)
+    && CHECK_F( L, R)
+    && CHECK_T( L, L, L, N(1), R, R, R)
+    && CHECK_T( S, N(42))
+    && CHECK_T( L, S, N(1), R)
+    && CHECK_T( S, L, N(1), R)
+    && CHECK_F( S)
+    && CHECK_T( S, S, S, N(42))
+    && CHECK_F( N(42), N(1337))
+    && CHECK_F( N(42), N(1337), N(666))
+    && CHECK_T( N(42), M, N(666))
+    && CHECK_F( N(42), M, N(666), S)
+    && CHECK_T( N(42), M, S, N(666))
+    && CHECK_T( N(42), M, S, S, N(666))
+    && CHECK_T( S, N(42), M, N(666))
+    && CHECK_T( S, S, N(42), M, N(666))
+    && CHECK_T( N(42), S, N(666))
+    && CHECK_T( N(42), D, N(666))
+    && CHECK_T( N(42), P, N(1337))
+    && CHECK_T( N(42), P, N(1337), D, N(1337))
+    && CHECK_T( N(42), D, N(1337), P, N(1337))
+    && CHECK_T( N(1337), P, N(42), D, N(1337), P, N(1337))
+    && CHECK_T( N(42), D, N(1337), P, N(1337), D, N(1337))
+    && CHECK_F( P, N(42), P, N(1337))
+    && CHECK_F( N(42), P, D, N(1337))
+    && CHECK_T( N(42), P, N(1337.5), P, N(666), P, S, S, N(1),  D, S, S, N(11));
 
     if (all_test)
-        ws::module::println(ws::module::colour::fg::green, ws::module::style::bold, "[O]", ws::module::style::reset, " Pass all tests");
+        ws::module::println(ws::module::colour::fg::green, ws::module::style::bold, "[_]", ws::module::style::reset, " Pass all tests");
     else
         ws::module::errorln("Error on tests");
 

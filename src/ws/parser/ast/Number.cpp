@@ -1,4 +1,4 @@
-#include <ws/parser/Number.hpp>
+#include <ws/parser/ast/Number.hpp>
 
 namespace ws::parser {
 
@@ -9,6 +9,10 @@ nlohmann::json Number::compile() const {
         {"type", "literal.float"},
         {"value", value}
     };
+}
+
+std::ostream& Number::dump(std::ostream& os) const {
+    return os << value;
 }
 
 }

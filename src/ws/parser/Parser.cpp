@@ -1,141 +1,134 @@
 #include <ws/parser/Parser.hpp>
+#include <ws/parser/ParserInternal.hpp>
+#include <ws/parser/token/TokenStream.hpp>
 
-#include <ws/parser/AST.hpp>
-#include <ws/parser/Number.hpp>
-#include <ws/parser/BinaryOperator.hpp>
-#include <ws/parser/UnaryOperator.hpp>
-
-#include <iostream>
-#include <map>
+#include <ws/parser/ast/AST.hpp>
+#include <ws/parser/ast/Number.hpp>
+#include <ws/parser/ast/BinaryOperator.hpp>
+#include <ws/parser/ast/UnaryOperator.hpp>
+#include <module/module.h>
 
 namespace ws::parser {
 
-ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens);
-ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens);
-ParserResult parse_expression(std::size_t& index, std::vector<Token> const& tokens);
-ParserResult parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
-ParserResult parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens);
-ParserResult parse_binary_operation(std::size_t& index, std::vector<Token> const& tokens, ParserResult(*next)(std::size_t&, std::vector<Token> const&), std::map<std::pair<TokenType, TokenSubType>, std::string> const& names);
+template<typename T>
+ParserResult to_result(Result<T> r) {
+    if (has_failed(r))
+        return std::get<ParserError>(r);
+    return std::move(std::get<T>(r));
+}
+
+AST_ptr term_to_AST(std::variant<std::tuple<Token, AST_ptr>, Token, /*std::tuple<Token, AST_ptr, Token>>*/ AST_ptr> expr) {
+    switch(expr.index()) {
+    case 0: // std::tuple<Token, AST_ptr>
+        return std::make_unique<UnaryOperator>("negate", std::move(std::get<1>(std::get<0>(expr))));
+    case 1: // Token
+        return std::make_unique<Number>(std::get<1>(expr).content);
+    case 2: // std::tuple<Token, AST_ptr, Token>
+        return std::move(std::get<2>(expr));
+    default:
+        ws::module::errorln("WTF ? term_to_AST::expr should have an index of 0, 1 or 2... What is going on ?");
+        return nullptr;
+    }
+}
+
+AST_ptr factor_to_AST(AST_ptr lhs, std::vector<std::tuple<std::variant<Token, Token>, AST_ptr>> rhs) {
+    for(auto& t : rhs) {
+        auto name = std::visit([] (Token t) {
+            if (t.subtype == TokenSubType::Division)
+                return "division";
+            return "multiplication";
+        }, std::get<0>(t));
+        lhs = std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(std::get<1>(t)));
+    }
+    return std::move(lhs);
+}
+
+AST_ptr expr_to_AST(AST_ptr lhs, std::vector<std::tuple<std::variant<Token, Token>, AST_ptr>> rhs) {
+    for(auto& t : rhs) {
+        auto name = std::visit([] (Token t) {
+            if (t.subtype == TokenSubType::Plus)
+                return "plus";
+            return "subtract";
+        }, std::get<0>(t));
+        lhs = std::make_unique<BinaryOperator>(name, std::move(lhs), std::move(std::get<1>(t)));
+    }
+    return std::move(lhs);
+}
 
 ParserResult parse(std::vector<Token> const& tokens) {
-    std::size_t i = 0;
+
+    /*
+     * expr := factor  (('-' | '+') factor)*
+     * factor := term (('*' | '/') term)*
+     * term := '-' term | float | '(' expr ')'
+     */
+
+    std::size_t indent = 0;
+
+    auto float_eater     = log(indent, "float", eat(TokenType::Literal,     TokenSubType::Float));
+    auto minus_eater     = log(indent, "'-'",   eat(TokenType::Operator,    TokenSubType::Minus));
+    auto plus_eater      = log(indent, "'+'",   eat(TokenType::Operator,    TokenSubType::Plus));
+    auto mult_eater      = log(indent, "'*'",   eat(TokenType::Operator,    TokenSubType::Multiplication));
+    auto div_eater       = log(indent, "'/'",   eat(TokenType::Operator,    TokenSubType::Division));
+    auto left_par_eater  = log(indent, "'('",   eat(TokenType::Parenthesis, TokenSubType::Left));
+    auto right_par_eater = log(indent, "')'",   eat(TokenType::Parenthesis, TokenSubType::Right));
+
+    Parser<AST_ptr> expr;
+    Parser<AST_ptr> term;
+
+    auto factor_operators = log(indent, 
+        "'*' | '/'",
+        mult_eater | div_eater);
+
+    auto expr_operators = log(indent, 
+        "'+' | '-'",
+        plus_eater | minus_eater);
+
+    auto term_negate = log(indent, 
+        "'-' term", 
+        minus_eater & ~term);
+
+    auto term_parentherized_expr = log(indent, 
+        "'(' expr ')'", 
+        left_par_eater > ~expr < right_par_eater);
+
+    term = log(indent, "term as AST", map(term_to_AST, log(indent, 
+        "term := '-' term | float | '(' expr ')'", 
+        term_negate | float_eater | term_parentherized_expr)));
+
+    auto factor_rhs = log(indent, 
+        "(('*' | '/') term)*",
+        many(log(indent, 
+            "('*' | '/') term", 
+            factor_operators & term)));
+
+    auto factor = log(indent, "factor as AST", mapI(factor_to_AST, log(indent, 
+        "factor := term (('*' | '/') term)*",
+        term & factor_rhs)));
+
+    auto expr_rhs = log(indent, 
+        "(('+' | '-') factor)*",
+        many(log(indent, 
+            "('+' | '-') factor", 
+            expr_operators & factor)));
+
+    expr = log(indent, "expr as AST", mapI(expr_to_AST, log(indent, 
+        "expr := factor (('+' | '-') factor)*",
+        factor & expr_rhs)));
 
     try {
-        auto expression = parse_expression(i, tokens);
-        if (i < tokens.size())
-            return ParserError::expected({"expression"});
-
-        return expression;
+        TokenStream it(tokens.begin(), tokens.end());
+        auto res = expr(it);
+        if (has_failed(res))
+            return std::get<ParserError>(res);
+        if (!it.is_end_of_stream())
+            return ParserError::expected({"end of stream"});
+            
+        return std::move(std::get<AST_ptr>(res));
 
     } catch(std::out_of_range const&) {
         return ParserError::error();
     }
-}
-
-ParserResult parse_number(std::size_t& index, std::vector<Token> const& tokens) {
-    auto& token = tokens.at(index++);
-
-    if (token.type != TokenType::Literal || token.subtype != TokenSubType::Float)
-        return ParserError::expected({"number litteral"});
-
-    return std::make_unique<Number>(
-        token.content
-    );
-}
-
-ParserResult parse_term(std::size_t& index, std::vector<Token> const& tokens) {
-    auto& token = tokens.at(index);
-
-    switch(token.type) {
-        case TokenType::Literal:
-            if (token.subtype == TokenSubType::Float)
-                return parse_number(index, tokens);
-            else
-                return ParserError::expected({"number litteral", "minus"});
-
-        case TokenType::Operator: {
-            if (token.subtype != TokenSubType::Minus)
-                return ParserError::expected({"number litteral", "minus"});
-
-            index++;
-            std::string name = tokens.at(index-1).content;
-            auto operand = parse_term(index, tokens);
-            if (is_error(operand))
-                return operand;
-            return std::make_unique<UnaryOperator>(name, std::move(*get_ast(operand)));
-        }
-
-        default:
-            return ParserError::expected({"number litteral", "minus"});
-    }
-}
-
-ParserResult parse_expression(std::size_t& index, std::vector<Token> const& tokens) {
-    return parse_low_binary_operation(index, tokens);
-}
-
-ParserResult parse_low_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
-    return parse_binary_operation(index, tokens, parse_high_binary_operation, {
-        {{TokenType::Operator, TokenSubType::Plus}, "plus"},
-        {{TokenType::Operator, TokenSubType::Minus}, "subtract"}
-    });
-}
-
-ParserResult parse_high_binary_operation(std::size_t& index, std::vector<Token> const& tokens) {
-    return parse_binary_operation(index, tokens, parse_term, {
-        {{TokenType::Operator, TokenSubType::Multiplication}, "multiplication"},
-        {{TokenType::Operator, TokenSubType::Division}, "division"}
-    });
-}
-
-ParserResult parse_binary_operation(
-    std::size_t& index,
-    std::vector<Token> const& tokens,
-    ParserResult(*next)(std::size_t&, std::vector<Token> const&),
-    std::map<std::pair<TokenType, TokenSubType>, std::string> const& names
-) {
-    auto lhs = next(index, tokens);
-
-    if (is_error(lhs))
-        return lhs;
-
-    if (index >= tokens.size())
-        return lhs;
-
-    std::optional<std::string> name;
-    auto get_name = [&names](TokenType type, TokenSubType subtype) -> std::optional<std::string> {
-        auto it = names.find({type, subtype});
-        if (it == names.end())
-            return std::nullopt;
-        return it->second;
-    };
-
-    {
-        auto* token = &tokens.at(index);
-        name = get_name(token->type, token->subtype);
-    }
-
-    while(name) {
-        index++;
-        auto rhs = next(index, tokens);
-
-        if (is_error(rhs))
-            return rhs;
-
-        lhs = std::make_unique<BinaryOperator>(
-            *name,
-            std::move(*get_ast(lhs)),
-            std::move(*get_ast(rhs))
-        );
-
-        if (index >= tokens.size())
-            return lhs;
-
-        auto& token = tokens.at(index);
-        name = get_name(token.type, token.subtype);
-    }
-
-    return lhs;
 }
 
 }

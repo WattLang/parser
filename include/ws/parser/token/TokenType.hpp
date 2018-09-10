@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 namespace ws::parser {
 
 enum class TokenType {
@@ -9,11 +11,15 @@ enum class TokenType {
 
 };
 
+std::ostream& operator<<(std::ostream& os, TokenType type);
+
 enum class TokenSubType {
     Left, Right,
     Plus, Minus, Multiplication, Division,
     Float
 
 };
+
+std::ostream& operator<<(std::ostream& os, TokenSubType subtype);
 
 }
