@@ -479,15 +479,21 @@ template<typename T>
 Parser<T> log(std::string const& name, Parser<T> const& parser) {
     return [=] (TokenStream& it) {
         ws::module::noticeln("• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
-        auto res = parser(it);
-        if (has_failed(res)) {
-            ws::module::warnln("• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", std::get<ParserError>(res).what());
-        } else {
-            ws::module::println(
-                ws::module::colour::fg::green, ws::module::style::bold, "[_] ", ws::module::style::reset, 
-                "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
+        try {
+            auto res = parser(it);
+
+            if (has_failed(res)) {
+                ws::module::warnln("• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", std::get<ParserError>(res).what());
+            } else {
+                ws::module::println(
+                    ws::module::colour::fg::green, ws::module::style::bold, "[_] ", ws::module::style::reset, 
+                    "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
+            }
+            return std::move(res);
+        } catch(...) {
+            ws::module::warnln("• <", ws::module::style::bold, name, ws::module::style::reset, "> threw an exception");
+            throw;
         }
-        return std::move(res);
     };
 }
 
@@ -503,17 +509,25 @@ template<typename T>
 Parser<T> log(std::size_t& spaces, std::string const& name, Parser<T> const& parser) {
     return [&spaces, name, parser] (TokenStream& it) {
         ws::module::noticeln(std::string(spaces, ' '), "• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
+
         spaces += 2;
-        auto res = parser(it);
-        spaces -= 2;
-        if (has_failed(res)) {
-            ws::module::warnln(std::string(spaces, ' '), "• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", std::get<ParserError>(res).what());
-        } else {
-            ws::module::println(
-                ws::module::colour::fg::green, ws::module::style::bold, "[_] ", std::string(spaces, ' '), ws::module::style::reset, 
-                "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
+        try {
+            auto res = parser(it);
+            spaces -= 2;
+
+            if (has_failed(res)) {
+                ws::module::warnln(std::string(spaces, ' '), "• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", std::get<ParserError>(res).what());
+            } else {
+                ws::module::println(
+                    ws::module::colour::fg::green, ws::module::style::bold, "[_] ", std::string(spaces, ' '), ws::module::style::reset, 
+                    "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
+            }
+            return std::move(res);
+        } catch(...) {
+            spaces -= 2;
+            ws::module::warnln(std::string(spaces, ' '), "• <", ws::module::style::bold, name, ws::module::style::reset, "> threw an exception");
+            throw;
         }
-        return std::move(res);
     };
 }
 
