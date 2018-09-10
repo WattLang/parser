@@ -1,6 +1,9 @@
 #include <iostream>
 #include <vector>
 #include <iomanip>
+#include <optional>
+#include <cmath>
+#include <random>
 
 #include <module/module.h>
 #include <ws/parser/Parser.hpp>
@@ -34,14 +37,50 @@ ws::parser::Token right() {
     return {")", ws::parser::TokenType::Parenthesis, ws::parser::TokenSubType::Right};
 }
 
-#define CHECK(parsable, print_ast, is...) check({ is }, parsable, print_ast)
-#define P plus()
-#define S sub()
-#define M mult()
-#define D div()
-#define L left()
-#define R right()
-#define N(n) number(n)
+std::optional<ws::parser::Token> tokenize(char c) {
+    if (c >='0' && c <= '9')
+        return number(static_cast<float>(c - '0'));
+
+    static std::random_device rd;
+    static std::mt19937 rng(rd());
+    static std::uniform_real_distribution<float> uni(-99.99f, 100.f);
+
+    switch(c) {
+        case 'i': {
+            auto n = uni(rng);
+            n = std::round(n * 100.f) / 100.f;
+            return number(n);
+        }
+
+        case '*':
+            return mult();
+        case '/':
+            return div();
+        case '+':
+            return plus();
+        case '-':
+            return sub();
+
+        case ')':
+            return right();
+        case '(':
+            return left();
+
+        default:
+            return std::nullopt;
+    }    
+}
+
+std::vector<ws::parser::Token> tokenize(std::string const& expr) {
+    std::vector<ws::parser::Token> tokens;
+    for(auto c : expr) {
+        auto token = tokenize(c);
+        if(token)
+            tokens.emplace_back(*token);
+    }
+
+    return tokens;
+}
 
 bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool print_ast) {
     auto out = ws::parser::parse(tokens);
@@ -81,40 +120,39 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool pri
 int main(int argc, char** argv) {
     bool print_ast = argc > 1 && std::string(argv[1]) == "--ast";
 
-#define CHECK_T(is...) CHECK(true, print_ast, is)
-#define CHECK_F(is...) CHECK(false, print_ast, is)
+#define CHECK_T(is...) check(tokenize(is), true, print_ast)
+#define CHECK_F(is...) check(tokenize(is), false, print_ast)
 
     bool all_test =
-       CHECK_F()
-    && CHECK_T( N(42))
-    && CHECK_T( L, N(1), R)
-    && CHECK_F( L, N(1))
-    && CHECK_F( N(1), R)
-    && CHECK_F( L, R)
-    && CHECK_T( L, L, L, N(1), R, R, R)
-    && CHECK_T( S, N(42))
-    && CHECK_T( L, S, N(1), R)
-    && CHECK_T( S, L, N(1), R)
-    && CHECK_F( S)
-    && CHECK_T( S, S, S, N(42))
-    && CHECK_F( N(42), N(1337))
-    && CHECK_F( N(42), N(1337), N(666))
-    && CHECK_T( N(42), M, N(666))
-    && CHECK_F( N(42), M, N(666), S)
-    && CHECK_T( N(42), M, S, N(666))
-    && CHECK_T( N(42), M, S, S, N(666))
-    && CHECK_T( S, N(42), M, N(666))
-    && CHECK_T( S, S, N(42), M, N(666))
-    && CHECK_T( N(42), S, N(666))
-    && CHECK_T( N(42), D, N(666))
-    && CHECK_T( N(42), P, N(1337))
-    && CHECK_T( N(42), P, N(1337), D, N(1337))
-    && CHECK_T( N(42), D, N(1337), P, N(1337))
-    && CHECK_T( N(1337), P, N(42), D, N(1337), P, N(1337))
-    && CHECK_T( N(42), D, N(1337), P, N(1337), D, N(1337))
-    && CHECK_F( P, N(42), P, N(1337))
-    && CHECK_F( N(42), P, D, N(1337))
-    && CHECK_T( N(42), P, N(1337.5), P, N(666), P, S, S, N(1),  D, S, S, N(11));
+       CHECK_F("")
+    && CHECK_T("i")
+    && CHECK_T("(i)")
+    && CHECK_F("(i")
+    && CHECK_F("i)")
+    && CHECK_F("()")
+    && CHECK_T("(((i)))")
+    && CHECK_T("-i")
+    && CHECK_T("(-i)")
+    && CHECK_T("-(i)")
+    && CHECK_F("-")
+    && CHECK_T("---i")
+    && CHECK_F("ii")
+    && CHECK_F("iii")
+    && CHECK_T("i*i")
+    && CHECK_T("i*-i")
+    && CHECK_T("i*--i")
+    && CHECK_T("-i*i")
+    && CHECK_T("--i*i")
+    && CHECK_T("i-i")
+    && CHECK_T("i/i")
+    && CHECK_T("i+i")
+    && CHECK_T("i+i/i")
+    && CHECK_T("i/i+i")
+    && CHECK_T("i+i/i+i")
+    && CHECK_T("i/i+i/i")
+    && CHECK_F("+i+i")
+    && CHECK_F("i+/i")
+    && CHECK_T("i+i+i+--i*--i");
 
     if (all_test)
         ws::module::println(ws::module::colour::fg::green, ws::module::style::bold, "[_]", ws::module::style::reset, " Pass all tests");
