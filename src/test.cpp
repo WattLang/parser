@@ -102,7 +102,7 @@ bool check(std::vector<ws::parser::Token> const& tokens, bool parsable, bool pri
     bool test_pass = !is_error(out) == parsable;
 
     if (test_pass)
-        ws::module::print(ws::module::colour::fg::green, ws::module::style::bold, "[_]", ws::module::style::reset, " OK");
+        ws::module::success("OK");
     else
         ws::module::error("ERROR");
 
@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
     && CHECK_T("i+i+i+--i*--i");
 
     if (all_test)
-        ws::module::println(ws::module::colour::fg::green, ws::module::style::bold, "[_]", ws::module::style::reset, " Pass all tests");
+        ws::module::successln("Pass all tests");
     else
         ws::module::errorln("Error on tests");
 

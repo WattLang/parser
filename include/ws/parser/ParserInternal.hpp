@@ -472,26 +472,76 @@ Parser<T> join (Parser<std::variant<T, Ts...>> const& parser) {
 
 
 /*
+ * log_begin (std::size_t, std::string)
+ *    Print the begin message with spaces before, used by 'log'
+ */
+void log_begin(std::size_t spaces, std::string const& name) {
+    ws::module::noticeln(ws::module::spaces(spaces), "• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
+}
+
+
+
+
+
+/*
+ * log_success (std::size_t, std::string, T)
+ *    Print the success message with spaces before, used by 'log'
+ */
+template<typename T>
+void log_success(std::size_t spaces, std::string const& name, T const& object) {
+    ws::module::successln(
+        ws::module::spaces(spaces), 
+        "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", 
+        ws::module::colour::fg::cyan, object);
+}
+
+
+
+
+
+/*
+ * log_failure (std::size_t, std::string, ParserError)
+ *    Print the failure message with spaces before, used by 'log'
+ */
+void log_failure(std::size_t spaces, std::string const& name, ParserError const& error) {
+    ws::module::warnln(ws::module::spaces(spaces), "• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", error.what());
+}
+
+
+
+
+
+/*
+ * log_exception (std::size_t, std::string)
+ *    Print the exception message with spaces before, used by 'log'
+ */
+void log_exception(std::size_t spaces, std::string const& name) {
+    ws::module::warnln(ws::module::spaces(spaces), "• <", ws::module::style::bold, name, ws::module::style::reset, "> threw an exception");
+}
+
+
+
+
+
+/*
  * log (std::string, Parser<A>) -> Parser<A>
  *    Print a message when the parser is run, and when it succed/fail, returns the result of that parser, the type A need to implement operato<<(std::ostream&)
  */
 template<typename T>
 Parser<T> log(std::string const& name, Parser<T> const& parser) {
     return [=] (TokenStream& it) {
-        ws::module::noticeln("• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
+        log_begin(0, name);
         try {
             auto res = parser(it);
 
-            if (has_failed(res)) {
-                ws::module::warnln("• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", std::get<ParserError>(res).what());
-            } else {
-                ws::module::println(
-                    ws::module::colour::fg::green, ws::module::style::bold, "[_] ", ws::module::style::reset, 
-                    "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
-            }
+            if (has_failed(res))
+                log_failure(0, name, std::get<ParserError>(res));
+            else
+                log_success(0, name, std::get<T>(res));
+
             return std::move(res);
         } catch(...) {
-            ws::module::warnln("• <", ws::module::style::bold, name, ws::module::style::reset, "> threw an exception");
+            log_exception(0, name);
             throw;
         }
     };
@@ -508,26 +558,24 @@ Parser<T> log(std::string const& name, Parser<T> const& parser) {
 template<typename T>
 Parser<T> log(std::size_t& spaces, std::string const& name, Parser<T> const& parser) {
     return [&spaces, name, parser] (TokenStream& it) {
-        ws::module::noticeln(std::string(spaces, ' '), "• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
-
-        spaces += 2;
+        log_begin(0, name);
         try {
+            spaces += 2;
             auto res = parser(it);
             spaces -= 2;
 
-            if (has_failed(res)) {
-                ws::module::warnln(std::string(spaces, ' '), "• <", ws::module::style::bold, name, ws::module::style::reset, "> failed: ", std::get<ParserError>(res).what());
-            } else {
-                ws::module::println(
-                    ws::module::colour::fg::green, ws::module::style::bold, "[_] ", std::string(spaces, ' '), ws::module::style::reset, 
-                    "• <", ws::module::style::bold, name, ws::module::style::reset, "> succeed: ", ws::module::colour::fg::cyan, std::get<T>(res));
-            }
+            if (has_failed(res))
+                log_failure(spaces, name, std::get<ParserError>(res));
+            else
+                log_success(spaces, name, std::get<T>(res));
+
             return std::move(res);
         } catch(...) {
+            log_exception(spaces, name);
             spaces -= 2;
-            ws::module::warnln(std::string(spaces, ' '), "• <", ws::module::style::bold, name, ws::module::style::reset, "> threw an exception");
             throw;
         }
+        ws::module::noticeln(ws::module::spaces(spaces), "• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
     };
 }
 
