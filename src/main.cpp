@@ -6,6 +6,7 @@
 #include <module/module.h>
 #include <json.hpp>
 #include <ws/parser/Parser.hpp>
+#include <ws/parser/token/TokenParser.hpp>
 
 std::vector<std::string> split_type(std::string const& s) {
     std::stringstream stream(s);
@@ -51,7 +52,7 @@ std::optional<ws::parser::TokenSubType> parse_subtype(std::string s) {
 std::vector<ws::parser::Token> parse_tokens(nlohmann::json const& json) {
     std::vector<ws::parser::Token> tokens;
     for(auto json_token : json) {
-        auto raw_type = json_token["type"].get<std::string>();
+        /*auto raw_type = json_token["type"].get<std::string>();
         auto types = split_type(raw_type);
         if (types.size() != 2) {
             ws::module::errorln("Couldn't parse type ", raw_type);
@@ -69,7 +70,13 @@ std::vector<ws::parser::Token> parse_tokens(nlohmann::json const& json) {
             return {};
         }
 
-        tokens.emplace_back(json_token["content"].get<std::string>(), *type, *subtype);
+        tokens.emplace_back(json_token["content"].get<std::string>(), *type, *subtype, 0, 0);*/
+        auto res = ws::parser::parse_token(json_token);
+        if (auto err = std::get_if<std::unique_ptr<ws::parser::TokenParsingError>>(&res); err) {
+            std::cout << (*err)->what() << '\n';
+            return {};
+        }
+        tokens.emplace_back(std::get<ws::parser::Token>(res));
     }
     return tokens;
 }
@@ -79,7 +86,14 @@ int main() {
     std::string raw_json = ws::module::receive_all(buffer_size);
     auto json = nlohmann::json::parse(raw_json);
     auto tokens = parse_tokens(json);
+
+    for(auto const& token : tokens) {
+        std::cout << token << '\n';
+    }
+
+
     auto result = ws::parser::parse(tokens);
+
 
     if (ws::parser::is_error(result)) {
         ws::module::errorln(ws::parser::get_error(result)->what());
