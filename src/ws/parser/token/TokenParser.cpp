@@ -5,6 +5,12 @@
 
 namespace ws::parser {
 
+std::string RootNotArray::what() const {
+    return "Root should be an array of tokens";
+}
+
+
+
 MissingKey::MissingKey(std::string const& key) : key(key) {}
 
 std::string MissingKey::what() const {
@@ -208,6 +214,27 @@ std::variant<Token, std::unique_ptr<TokenParsingError>> parse_token(json_t const
         std::get<std::size_t>(line),
         std::get<std::size_t>(column)
     };
+}
+
+
+
+std::variant<std::vector<ws::parser::Token>, std::unique_ptr<TokenParsingError>> parse_tokens(json_t const& json) {
+    if (!json.is_array())
+        return std::make_unique<RootNotArray>();
+
+    std::vector<ws::parser::Token> tokens;
+
+    for(auto json_token : json) {
+        auto res = ws::parser::parse_token(json_token);
+
+        if (auto err = std::get_if<std::unique_ptr<ws::parser::TokenParsingError>>(&res); err) {
+            std::cout << (*err)->what() << '\n';
+            return std::move(*err);
+        }
+        
+        tokens.emplace_back(std::get<ws::parser::Token>(res));
+    }
+    return tokens;
 }
 
 }

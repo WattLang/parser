@@ -18,6 +18,12 @@ public:
     virtual std::string what() const = 0;
 };
 
+class RootNotArray : public TokenParsingError {
+public:
+    virtual std::string what() const override;
+
+};
+
 class MissingKey : public TokenParsingError {
 public:
     MissingKey(std::string const& key);
@@ -72,5 +78,6 @@ private:
 };
 
 std::variant<Token, std::unique_ptr<TokenParsingError>> parse_token(json_t const& json);
+std::variant<std::vector<ws::parser::Token>, std::unique_ptr<TokenParsingError>> parse_tokens(json_t const& json);
 
 }
