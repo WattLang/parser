@@ -62,7 +62,7 @@ EXT_INC_FILE = .hpp
 # EX: $(1:%$(EXT_SRC_FILE)=%$(EXT_INC_FILE)) 
 # will take the file "folder/sub_folder_file.cpp"
 # and transform it into "folder/sub_folder_file.hpp"
-header-of = $(1:%$(EXT_SRC_FILE)=car_sim/%$(EXT_INC_FILE))
+header-of = $(1:%$(EXT_SRC_FILE)=%$(EXT_INC_FILE))
 
 # Relative to $(SRC_FOLDER)
 SRC_EXCLUDE_FILE := 
