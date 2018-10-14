@@ -525,7 +525,7 @@ void log_exception(std::size_t spaces, std::string const& name) {
 
 /*
  * log (std::string, Parser<A>) -> Parser<A>
- *    Print a message when the parser is run, and when it succed/fail, returns the result of that parser, the type A need to implement operato<<(std::ostream&)
+ *    Print a message when the parser is run, and when it succeed/fail, returns the result of that parser, the type A need to implement operator<<(std::ostream&)
  */
 template<typename T>
 Parser<T> log(std::string const& name, Parser<T> const& parser) {
@@ -553,12 +553,12 @@ Parser<T> log(std::string const& name, Parser<T> const& parser) {
 
 /*
  * log (std::size_t&, std::string, Parser<A>) -> Parser<A>
- *    Equivalent of log but will use spaces to indent the code, it also increament it for the future logs
+ *    Equivalent of log but will use spaces to indent the code, it also increment it for the future logs
  */
 template<typename T>
 Parser<T> log(std::size_t& spaces, std::string const& name, Parser<T> const& parser) {
     return [&spaces, name, parser] (TokenStream& it) {
-        log_begin(0, name);
+        log_begin(spaces, name);
         try {
             spaces += 2;
             auto res = parser(it);
@@ -571,11 +571,10 @@ Parser<T> log(std::size_t& spaces, std::string const& name, Parser<T> const& par
 
             return std::move(res);
         } catch(...) {
-            log_exception(spaces, name);
             spaces -= 2;
+            log_exception(spaces, name);
             throw;
         }
-        ws::module::noticeln(ws::module::spaces(spaces), "• Begin <", ws::module::style::bold, name, ws::module::style::reset, ">");
     };
 }
 
