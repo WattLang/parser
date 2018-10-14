@@ -9,11 +9,15 @@ namespace ws::parser {
 class Token {
 public:
 
-    Token(std::string const& content, TokenType type, TokenSubType subtype);
+    Token() = default;
+    Token(std::string const& content, TokenType type, TokenSubType subtype, std::size_t line, std::size_t column);
 
     std::string content;
     TokenType type;
     TokenSubType subtype;
+
+    std::size_t line;
+    std::size_t column;
 
 };
 
