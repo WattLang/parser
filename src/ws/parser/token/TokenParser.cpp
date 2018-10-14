@@ -192,7 +192,7 @@ std::variant<std::pair<TokenType, TokenSubType>, std::unique_ptr<TokenParsingErr
 
 
 
-std::variant<Token, std::unique_ptr<TokenParsingError>> parse_token(json_t const& json) {
+SingleTokenParserResult parse_token(json_t const& json) {
     auto content = parse_content(json);
     auto type = parse_type(json);
     auto line = parse_position(json, "line");
@@ -218,7 +218,7 @@ std::variant<Token, std::unique_ptr<TokenParsingError>> parse_token(json_t const
 
 
 
-std::variant<std::vector<ws::parser::Token>, std::unique_ptr<TokenParsingError>> parse_tokens(json_t const& json) {
+TokenParserResult parse_tokens(json_t const& json) {
     if (!json.is_array())
         return std::make_unique<RootNotArray>();
 
@@ -227,14 +227,61 @@ std::variant<std::vector<ws::parser::Token>, std::unique_ptr<TokenParsingError>>
     for(auto json_token : json) {
         auto res = ws::parser::parse_token(json_token);
 
-        if (auto err = std::get_if<std::unique_ptr<ws::parser::TokenParsingError>>(&res); err) {
+        if (auto err = get_error(res); err) {
             std::cout << (*err)->what() << '\n';
             return std::move(*err);
         }
-        
-        tokens.emplace_back(std::get<ws::parser::Token>(res));
+
+        tokens.emplace_back(*get_token(res));
     }
     return tokens;
 }
+
+
+
+bool is_error(SingleTokenParserResult const& res) {
+    return get_error(res) != nullptr;
+}
+
+bool is_error(TokenParserResult const& res) {
+    return get_error(res) != nullptr;
+}
+
+
+
+std::unique_ptr<TokenParsingError> const* get_error(SingleTokenParserResult const& error) {
+    return std::get_if<std::unique_ptr<TokenParsingError>>(&error);
+}
+
+Token const* get_token(SingleTokenParserResult const& error) {
+    return std::get_if<Token>(&error);
+}
+
+std::unique_ptr<TokenParsingError>* get_error(SingleTokenParserResult& error) {
+    return std::get_if<std::unique_ptr<TokenParsingError>>(&error);
+}
+
+Token* get_token(SingleTokenParserResult& error) {
+    return std::get_if<Token>(&error);
+}
+
+
+
+std::unique_ptr<TokenParsingError> const* get_error(TokenParserResult const& error) {
+    return std::get_if<std::unique_ptr<TokenParsingError>>(&error);
+}
+
+std::vector<Token> const* get_tokens(TokenParserResult const& error) {
+    return std::get_if<std::vector<Token>>(&error);
+}
+
+std::unique_ptr<TokenParsingError>* get_error(TokenParserResult& error) {
+    return std::get_if<std::unique_ptr<TokenParsingError>>(&error);
+}
+
+std::vector<Token>* get_tokens(TokenParserResult& error) {
+    return std::get_if<std::vector<Token>>(&error);
+}
+
 
 }

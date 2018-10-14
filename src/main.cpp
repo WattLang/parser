@@ -14,12 +14,12 @@ int main() {
     auto json = nlohmann::json::parse(raw_json);
     auto tokens_res = ws::parser::parse_tokens(json);
 
-    if (auto err = std::get_if<std::unique_ptr<ws::parser::TokenParsingError>>(&tokens_res); err) {
+    if (auto err = get_error(tokens_res); err) {
         ws::module::errorln((*err)->what());
         return 1;
     }
 
-    auto& tokens = std::get<std::vector<ws::parser::Token>>(tokens_res);
+    auto& tokens = *get_tokens(tokens_res);
 
     for(auto const& token : tokens) {
         std::cout << token << '\n';

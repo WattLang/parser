@@ -77,7 +77,23 @@ private:
 
 };
 
-std::variant<Token, std::unique_ptr<TokenParsingError>> parse_token(json_t const& json);
-std::variant<std::vector<ws::parser::Token>, std::unique_ptr<TokenParsingError>> parse_tokens(json_t const& json);
+using TokenParserResult = std::variant<std::vector<ws::parser::Token>, std::unique_ptr<TokenParsingError>>;
+using SingleTokenParserResult = std::variant<Token, std::unique_ptr<TokenParsingError>>;
+
+SingleTokenParserResult parse_token(json_t const& json);
+TokenParserResult parse_tokens(json_t const& json);
+
+bool is_error(SingleTokenParserResult const& res);
+bool is_error(TokenParserResult const& res);
+
+std::unique_ptr<TokenParsingError> const* get_error(SingleTokenParserResult const& error);
+Token const* get_token(SingleTokenParserResult const& error);
+std::unique_ptr<TokenParsingError>* get_error(SingleTokenParserResult& error);
+Token* get_token(SingleTokenParserResult& error);
+
+std::unique_ptr<TokenParsingError> const* get_error(TokenParserResult const& error);
+std::vector<ws::parser::Token> const* get_tokens(TokenParserResult const& error);
+std::unique_ptr<TokenParsingError>* get_error(TokenParserResult& error);
+std::vector<ws::parser::Token>* get_tokens(TokenParserResult& error);
 
 }
